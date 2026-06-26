@@ -55,7 +55,7 @@ def test_find_root_searches_down_for_bspec_json(tmp_path):
 def test_find_root_prefers_bspec_json_over_behavior_dir(tmp_path):
     # bspec.json is authoritative; a behavior/ dir above it must not shadow it
     _write(tmp_path / "behavior" / "x.bspec.json", {"bspecVersion": "0.1.0",
-           "module": {"id": "x", "summary": "above"}})
+           "module": {"id": "x", "name": "X", "rationale": "above"}})
     root = tmp_path / "docs" / "specs"
     _write(root / "bspec.json", {"version": "0.1.0", "specGlobs": ["**/*.bspec.json"], "reviews": {}})
     assert loader.find_root(str(root / "deep" / "deeper")) == str(root)
@@ -65,7 +65,7 @@ def test_specglobs_honored(tmp_path):
     root = tmp_path / "p"
     _write(root / "bspec.json", {"version": "0.1.0", "specGlobs": ["specs/**/*.bspec.json"], "reviews": {}})
     _write(root / "specs" / "m.bspec.json",
-           {"bspecVersion": "0.1.0", "module": {"id": "m", "summary": "specglob fixture"}})
+           {"bspecVersion": "0.1.0", "module": {"id": "m", "name": "M", "rationale": "specglob fixture"}})
     proj, diags = loader.load_project(str(root))
     assert proj.get("module", "m") is not None
     assert _errors(diags) == []
@@ -74,7 +74,7 @@ def test_specglobs_honored(tmp_path):
 def test_specglobs_defaults_when_absent(tmp_path):
     root = tmp_path / "p"
     _write(root / "behavior" / "m.bspec.json",
-           {"bspecVersion": "0.1.0", "module": {"id": "m", "summary": "default-glob fixture"}})
+           {"bspecVersion": "0.1.0", "module": {"id": "m", "name": "M", "rationale": "default-glob fixture"}})
     proj, _ = loader.load_project(str(root))
     assert proj.get("module", "m") is not None
 

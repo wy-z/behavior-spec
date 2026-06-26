@@ -9,23 +9,26 @@ with the `bspec` CLI.
 |---|---|
 | `module` | Human review boundary (NOT a code package). |
 | `interface` | Observable boundary; `direction` input/output/bidirectional; open-string `protocol`. |
-| `observable` | A reviewable value; `role` state/parameter/derived; restricted `valueSchema`. |
+| `observable` | A reviewable value; `role` state/parameter; restricted `valueSchema`. |
 | `event` | Input or output at a point in time; `direction`; `interface` ref; `payloadSchema`. |
 | `behavior` | `given` + `when` → `then`. One trigger event, one business reaction. |
 | `invariant` | `while` → `assert`; must always hold. |
 | `flow` | Ordered behavior ids; navigation only, non-normative. |
-| `origin` | Why the agent derived a spec; review metadata, non-normative. |
+| `origin` | Why the agent derived a spec (file-level); review metadata, non-normative. |
 
-Cosmetic text (`title`, observable `description`, `origin.note`) is **non-normative**.
-Every review unit (module/behavior/invariant/flow) needs a non-empty `summary`; it
-**is** in the semantic hash (the reviewer approves from it). An optional file-level
+Every object has a `name` (short label, **cosmetic**; the tool prepends the raw
+`[kind][direction]` tag at review — never author it). `name` and `origin.note` are
+non-normative. Review units (module/behavior/invariant/flow) need a `rationale`
+(why) and — for behavior/invariant — a `title` (EARS requirement): **both are in
+the semantic hash** (the reviewer approves from them). A definition's optional
+`description` is hashed *when referenced* by a rule. An optional file-level
 `glossary` (`{ "term": "definition" }`) is also hashed into the module.
 
 ## CEL namespaces and per-clause allow-list
 
 | Namespace | Contents |
 |---|---|
-| `before` / `after` / `current` | observables with role `state` or `derived` |
+| `before` / `after` / `current` | observables with role `state` |
 | `params` | observables with role `parameter` |
 | `trigger` | the input event payload |
 | `emitted` | the expected output event payload |
@@ -78,11 +81,12 @@ object→typed object, array→list.
   / `rejected` / `deferred`)
 - record hash != current → `stale`
 
-The semantic hash covers the approved contract: CEL (canonicalized), referenced
-observable/event schemas (inlined), and the unit's `summary`. Changing a referenced
-schema makes dependent behaviors stale automatically. Module/flow hashes are
-members/order + summary/glossary only (non-cascade): editing a member behavior does
-not stale the module — `bspec status` shows a per-module rollup instead.
+The semantic hash covers the approved contract: CEL (canonicalized), the unit's
+`title` + `rationale`, and the referenced observable/event meaning (schema +
+`description`, inlined). Changing a referenced schema or description makes dependent
+behaviors stale automatically. Module/flow hashes are members/order +
+title/rationale/glossary only (non-cascade): editing a member behavior does not
+stale the module — `bspec status` shows a per-module rollup instead.
 
 ## CLI
 
@@ -91,5 +95,4 @@ bspec init [path]                           # scaffold bspec.json + example.bspe
 bspec validate [path] [--json] [--strict]   # schema + reference + CEL checks (exit 1 on error)
 bspec review [--module M] [--kind K] [--status S]   # interactive; only writer of bspec.json
 bspec status [path] [--json]                # per-kind + per-module status
-bspec context --module M [--approved]       # JSON export of approved+fresh behavior
 ```

@@ -31,7 +31,7 @@ def run(proj: Project) -> list[Diagnostic]:
     _check_observable_prefix(proj, diags)
     _check_schemas(proj, diags)
     _check_references(proj, diags)
-    _check_summaries(proj, diags)
+    _check_prose(proj, diags)
     _check_unused(proj, diags)
     _check_origin_paths(proj, diags)
     _check_flows_and_modules(proj, diags)
@@ -176,20 +176,28 @@ def _require_event(events, eid, direction, sym, path, diags) -> None:
                                 unit=f"behavior:{sym.id}", file=sym.file, path=path))
 
 
-def _check_summaries(proj: Project, diags: list[Diagnostic]) -> None:
-    """Every review unit needs a plain-language summary (the reviewer's surface).
-
-    Schema enforces presence + minLength; here we reject the stub pattern where
-    summary just echoes the title or id, since that carries no explanation.
+def _check_prose(proj: Project, diags: list[Diagnostic]) -> None:
+    """Reject stub prose. Schema enforces presence + minLength; here we reject the
+    lazy patterns that carry no review value: a `rationale` that just echoes the
+    title/name/id (it must say *why*, not restate the rule), and a `name` that is
+    just the id (it must be a human label).
     """
     for kind in REVIEW_KINDS:
         for sym in proj.kind(kind).values():
-            s = (sym.obj.get("summary") or "").strip()
-            title = (sym.obj.get("title") or "").strip()
-            if s and (s == title or s == sym.id):
-                diags.append(Diagnostic("error", "stub-summary",
-                                        f"{kind} '{sym.id}' summary just repeats its title/id; "
-                                        "write a plain-language explanation a layperson can review",
+            o = sym.obj
+            r = (o.get("rationale") or "").strip()
+            echoes = {(o.get("title") or "").strip(), (o.get("name") or "").strip(), sym.id}
+            if r and r in echoes:
+                diags.append(Diagnostic("error", "stub-rationale",
+                                        f"{kind} '{sym.id}' rationale just repeats its title/name/id; "
+                                        "write *why* it exists / what it prevents",
+                                        unit=f"{kind}:{sym.id}", file=sym.file))
+    for kind in (*REVIEW_KINDS, "interface", "event", "observable"):
+        for sym in proj.kind(kind).values():
+            if (sym.obj.get("name") or "").strip() == sym.id:
+                diags.append(Diagnostic("error", "stub-name",
+                                        f"{kind} '{sym.id}' name just repeats its id; "
+                                        "write a short human label in the project lang",
                                         unit=f"{kind}:{sym.id}", file=sym.file))
 
 

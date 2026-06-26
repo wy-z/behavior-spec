@@ -10,7 +10,7 @@ import json
 import os
 import sys
 
-from . import context, loader, review, schema, status
+from . import doc, loader, review, schema, status
 from .model import REVIEW_STATE_FILENAME, Diagnostic, Project
 
 
@@ -70,6 +70,13 @@ def cmd_validate(args: argparse.Namespace) -> int:
 # --------------------------------------------------------------------------- #
 # init
 # --------------------------------------------------------------------------- #
+# The type words `bspec review` localizes in the `[kind][direction]` tag. `init`
+# scaffolds them (English placeholders) so a non-English project has the exact list
+# to translate — the tool itself never translates, it only looks the values up.
+_TYPE_TOKENS = ("module", "behavior", "invariant", "flow", "interface", "event",
+                "observable", "input", "output", "bidirectional", "state", "parameter")
+
+
 def cmd_init(args: argparse.Namespace) -> int:
     root = os.path.abspath(args.path or os.getcwd())
     os.makedirs(root, exist_ok=True)
@@ -78,12 +85,14 @@ def cmd_init(args: argparse.Namespace) -> int:
     review_state = os.path.join(root, REVIEW_STATE_FILENAME)
     if not os.path.exists(review_state):
         state = {
-            "$schema": "https://bspec.dev/0.1/review-state.schema.json",
+            "$schema": "https://wy-z.github.io/behavior-spec/v1/review-state.schema.json",
             "version": "0.1.0",
-            "lang": "en",
-            "specGlobs": ["**/*.bspec.json"],
-            "reviews": {},
+            "lang": args.lang,
         }
+        if args.lang != "en":
+            state["glossary"] = {t: t for t in _TYPE_TOKENS}
+        state["specGlobs"] = ["**/*.bspec.json"]
+        state["reviews"] = {}
         with open(review_state, "w", encoding="utf-8") as f:
             json.dump(state, f, indent=2)
             f.write("\n")
@@ -108,7 +117,7 @@ def cmd_init(args: argparse.Namespace) -> int:
 
 
 # --------------------------------------------------------------------------- #
-# status / context / review
+# status / review
 # --------------------------------------------------------------------------- #
 def cmd_status(args: argparse.Namespace) -> int:
     root = loader.find_root(args.path or os.getcwd())
@@ -120,13 +129,13 @@ def cmd_status(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_context(args: argparse.Namespace) -> int:
-    root = loader.find_root(os.getcwd())
+def cmd_doc(args: argparse.Namespace) -> int:
+    root = loader.find_root(args.path or os.getcwd())
     proj, _ = loader.load_project(root)
-    if proj.get("module", args.module) is None:
+    if args.module and proj.get("module", args.module) is None:
         print(f"unknown module '{args.module}'", file=sys.stderr)
         return 1
-    print(json.dumps(context.export(proj, args.module, args.approved), indent=2, ensure_ascii=False))
+    print(doc.render(proj, args.module), end="")
     return 0
 
 
@@ -150,6 +159,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     pi = sub.add_parser("init", help="scaffold a bspec project")
     pi.add_argument("path", nargs="?", help="project directory (default: cwd)")
+    pi.add_argument("--lang", default="en",
+                    help="project language for human-readable text (default: en); "
+                         "non-en also scaffolds a type-word glossary to translate")
     pi.set_defaults(func=cmd_init)
 
     pv = sub.add_parser("validate", help="schema + reference + CEL checks")
@@ -163,10 +175,10 @@ def build_parser() -> argparse.ArgumentParser:
     ps.add_argument("--json", action="store_true", help="machine-readable output")
     ps.set_defaults(func=cmd_status)
 
-    pc = sub.add_parser("context", help="export approved behavior for an agent")
-    pc.add_argument("--module", required=True, help="module id to export")
-    pc.add_argument("--approved", action="store_true", help="only approved+fresh items")
-    pc.set_defaults(func=cmd_context)
+    pdoc = sub.add_parser("doc", help="markdown + mermaid export (for GitHub/sharing)")
+    pdoc.add_argument("path", nargs="?", help="project directory (default: cwd)")
+    pdoc.add_argument("--module", help="restrict to one module")
+    pdoc.set_defaults(func=cmd_doc)
 
     pr = sub.add_parser("review", help="interactive review (writes bspec.json)")
     pr.add_argument("--module", help="restrict to one module")

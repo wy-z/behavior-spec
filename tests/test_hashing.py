@@ -30,21 +30,40 @@ def test_hash_format():
     assert re.fullmatch(r"sha256:[0-9a-f]{64}", h)
 
 
-def test_hash_stable_under_title_change():
+def test_hash_stable_under_name_change():
+    # name is a cosmetic display label, not part of the approved contract
     proj = _proj()
     sym = proj.get("behavior", "trading.ma-cross.open-long")
     before = hashing.unit_hash(proj, "behavior", sym.id)
-    sym.obj["title"] = "totally different title"
-    sym.obj["origin"] = [{"kind": "code", "uri": "x.py", "lineStart": 999, "lineEnd": 1000}]
+    sym.obj["name"] = "totally different name"
+    sym.obj["origin"] = [{"kind": "code", "uri": "x.py"}]
     assert hashing.unit_hash(proj, "behavior", sym.id) == before
 
 
-def test_hash_changes_on_summary_edit():
-    # summary is the human-approved explanation, so it IS review-significant
+def test_hash_changes_on_title_edit():
+    # title is the EARS requirement the layperson approves, so it IS hashed
     proj = _proj()
     sym = proj.get("behavior", "trading.ma-cross.open-long")
     before = hashing.unit_hash(proj, "behavior", sym.id)
-    sym.obj["summary"] = "a materially different plain-language explanation"
+    sym.obj["title"] = "a materially different requirement statement"
+    assert hashing.unit_hash(proj, "behavior", sym.id) != before
+
+
+def test_hash_changes_on_rationale_edit():
+    # rationale is the human-approved why, so it IS review-significant
+    proj = _proj()
+    sym = proj.get("behavior", "trading.ma-cross.open-long")
+    before = hashing.unit_hash(proj, "behavior", sym.id)
+    sym.obj["rationale"] = "a materially different plain-language explanation"
+    assert hashing.unit_hash(proj, "behavior", sym.id) != before
+
+
+def test_hash_changes_on_referenced_description_edit():
+    # an observable's description shapes how a reviewer understands the rule
+    proj = _proj()
+    sym = proj.get("behavior", "trading.ma-cross.open-long")
+    before = hashing.unit_hash(proj, "behavior", sym.id)
+    proj.get("observable", "position.quantity").obj["description"] = "now means something else"
     assert hashing.unit_hash(proj, "behavior", sym.id) != before
 
 

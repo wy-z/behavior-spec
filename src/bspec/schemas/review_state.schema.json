@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://bspec.dev/0.1/review-state.schema.json",
+  "$id": "https://wy-z.github.io/behavior-spec/v1/review-state.schema.json",
   "title": "bspec review state (bspec.json)",
   "type": "object",
   "required": ["version", "reviews"],
@@ -8,6 +8,7 @@
     "$schema": { "type": "string" },
     "version": { "type": "string", "const": "0.1.0" },
     "lang": { "type": "string", "default": "en" },
+    "glossary": { "type": "object", "additionalProperties": { "type": "string", "minLength": 1 } },
     "specGlobs": { "type": "array", "items": { "type": "string" } },
     "reviews": {
       "type": "object",

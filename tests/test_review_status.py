@@ -1,7 +1,7 @@
 import shutil
 from pathlib import Path
 
-from bspec import context, hashing, loader, review, status
+from bspec import hashing, loader, review, status
 
 FIX = Path(__file__).parent / "fixtures" / "valid"
 OPEN_LONG = "trading.ma-cross.open-long"
@@ -45,40 +45,3 @@ def test_written_review_state_is_schema_valid(tmp_path):
     rec = state["reviews"][f"behavior:{OPEN_LONG}"]
     assert "reviewer" not in rec
     assert state["lang"] == "en"
-
-
-def test_context_full_export(tmp_path):
-    proj, _ = _proj(tmp_path)
-    exp = context.export(proj, "trading.ma-cross", approved=False)
-    assert {b["id"] for b in exp["behaviors"]} == {OPEN_LONG, CLOSE_LONG}
-    assert len(exp["invariants"]) == 1
-    obs = {o["id"] for o in exp["dependencies"]["observables"]}
-    assert {"session.open", "position.quantity", "risk.max_order_notional"} <= obs
-    assert {e["id"] for e in exp["dependencies"]["events"]} == {"market.bar.closed", "broker.order.requested"}
-    # non-approved export annotates each item with its computed reviewStatus
-    assert all(b["reviewStatus"] == "pending" for b in exp["behaviors"])
-    assert "glossary" in exp and "lang" in exp
-
-
-def test_context_approved_gates_per_item(tmp_path):
-    proj, root = _proj(tmp_path)
-    assert context.export(proj, "trading.ma-cross", approved=True)["behaviors"] == []
-
-    review.record_decision(root, f"behavior:{OPEN_LONG}",
-                           "approved", hashing.unit_hash(proj, "behavior", OPEN_LONG))
-    exp = context.export(proj, "trading.ma-cross", approved=True)
-    assert {b["id"] for b in exp["behaviors"]} == {OPEN_LONG}
-    # the flow needs ITSELF + every step approved+fresh; only open-long is → omitted
-    assert exp["flows"] == []
-
-
-def test_context_approved_exports_fully_approved_flow(tmp_path):
-    proj, root = _proj(tmp_path)
-    flow_id = "trading.trade-cycle"
-    for kind, oid in [("behavior", OPEN_LONG), ("behavior", CLOSE_LONG), ("flow", flow_id)]:
-        review.record_decision(root, f"{kind}:{oid}", "approved",
-                               hashing.unit_hash(proj, kind, oid))
-    exp = context.export(proj, "trading.ma-cross", approved=True)
-    assert [f["id"] for f in exp["flows"]] == [flow_id]
-    assert exp["flows"][0]["steps"] == [OPEN_LONG, CLOSE_LONG]
-    assert "_excludedSteps" not in exp["flows"][0]

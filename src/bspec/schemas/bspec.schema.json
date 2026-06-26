@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://bspec.dev/0.1/schema.json",
+  "$id": "https://wy-z.github.io/behavior-spec/v1/schema.json",
   "title": "Behavior Spec module file (v0.1)",
   "type": "object",
   "required": ["bspecVersion", "module"],
@@ -32,21 +32,23 @@
 
     "module": {
       "type": "object",
-      "required": ["id", "summary"],
+      "required": ["id", "name", "rationale"],
       "properties": {
         "id": { "$ref": "#/$defs/generalId" },
-        "title": { "type": "string" },
-        "summary": { "type": "string", "minLength": 1 }
+        "name": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "rationale": { "type": "string", "minLength": 1 }
       },
       "unevaluatedProperties": false
     },
 
     "interface": {
       "type": "object",
-      "required": ["id", "direction"],
+      "required": ["id", "name", "direction"],
       "properties": {
         "id": { "$ref": "#/$defs/generalId" },
-        "title": { "type": "string" },
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
         "direction": { "type": "string", "enum": ["input", "output", "bidirectional"] },
         "protocol": { "type": "string" }
       },
@@ -55,12 +57,12 @@
 
     "observable": {
       "type": "object",
-      "required": ["id", "role", "valueSchema"],
+      "required": ["id", "name", "role", "valueSchema"],
       "properties": {
         "id": { "$ref": "#/$defs/celId" },
-        "title": { "type": "string" },
+        "name": { "type": "string", "minLength": 1 },
         "description": { "type": "string" },
-        "role": { "type": "string", "enum": ["state", "parameter", "derived"] },
+        "role": { "type": "string", "enum": ["state", "parameter"] },
         "valueSchema": { "$ref": "#/$defs/jsonSchema" }
       },
       "unevaluatedProperties": false
@@ -68,10 +70,11 @@
 
     "event": {
       "type": "object",
-      "required": ["id", "direction", "interface", "payloadSchema"],
+      "required": ["id", "name", "direction", "interface", "payloadSchema"],
       "properties": {
         "id": { "$ref": "#/$defs/generalId" },
-        "title": { "type": "string" },
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
         "direction": { "type": "string", "enum": ["input", "output"] },
         "interface": { "$ref": "#/$defs/generalId" },
         "payloadSchema": { "$ref": "#/$defs/jsonSchema" }
@@ -81,11 +84,12 @@
 
     "behavior": {
       "type": "object",
-      "required": ["id", "summary", "when", "then"],
+      "required": ["id", "name", "title", "rationale", "when", "then"],
       "properties": {
         "id": { "$ref": "#/$defs/generalId" },
-        "title": { "type": "string" },
-        "summary": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "rationale": { "type": "string", "minLength": 1 },
         "given": { "$ref": "#/$defs/cel" },
         "when": { "$ref": "#/$defs/when" },
         "then": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/thenEntry" } },
@@ -144,11 +148,12 @@
 
     "invariant": {
       "type": "object",
-      "required": ["id", "summary", "assert"],
+      "required": ["id", "name", "title", "rationale", "assert"],
       "properties": {
         "id": { "$ref": "#/$defs/generalId" },
-        "title": { "type": "string" },
-        "summary": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "rationale": { "type": "string", "minLength": 1 },
         "while": { "$ref": "#/$defs/cel" },
         "assert": { "$ref": "#/$defs/cel" },
         "origin": { "type": "array", "items": { "$ref": "#/$defs/origin" } }
@@ -158,11 +163,12 @@
 
     "flow": {
       "type": "object",
-      "required": ["id", "summary", "steps"],
+      "required": ["id", "name", "rationale", "steps"],
       "properties": {
         "id": { "$ref": "#/$defs/generalId" },
-        "title": { "type": "string" },
-        "summary": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "rationale": { "type": "string", "minLength": 1 },
         "steps": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/generalId" } }
       },
       "unevaluatedProperties": false
@@ -174,8 +180,6 @@
       "properties": {
         "kind": { "type": "string", "enum": ["code", "config", "doc", "runtime", "human", "inference"] },
         "uri": { "type": "string" },
-        "lineStart": { "type": "integer", "minimum": 1 },
-        "lineEnd": { "type": "integer", "minimum": 1 },
         "note": { "type": "string" }
       },
       "unevaluatedProperties": false

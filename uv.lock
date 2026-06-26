@@ -24,6 +24,7 @@ dependencies = [
     { name = "jsonschema" },
     { name = "rfc8785" },
     { name = "rich" },
+    { name = "termaid" },
 ]
 
 [package.optional-dependencies]
@@ -38,6 +39,7 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },
     { name = "rfc8785", specifier = ">=0.1.2" },
     { name = "rich", specifier = ">=15.0.0" },
+    { name = "termaid", specifier = ">=0.7.1" },
 ]
 provides-extras = ["dev"]
 
@@ -543,6 +545,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68a0e064b6af791aa332cf192da575fd474ed7d6f16a2/six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81", size = 34031, upload-time = "2024-12-04T17:35:28.174Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274", size = 11050, upload-time = "2024-12-04T17:35:26.475Z" },
+]
+
+[[package]]
+name = "termaid"
+version = "0.7.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/78/f3/b6d77f6c7f3ff3135c589334c115094e21facd3b7b6dbd57b1652d8088fa/termaid-0.7.1.tar.gz", hash = "sha256:13aca21054b39c122761e28ee2baaaa1ef5f187e5a39589660b1640c01ebaa5d", size = 397861, upload-time = "2026-06-11T16:38:25.664Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/20/88/1c7c9f616276ed22decc8dd62d47df20db311fa682a38548e44e66e4b4b4/termaid-0.7.1-py3-none-any.whl", hash = "sha256:80d45c719b3a432215fd61017b2cc2ee219524424061bc323c9aa3faacaf2bda", size = 157258, upload-time = "2026-06-11T16:38:23.693Z" },
 ]
 
 [[package]]

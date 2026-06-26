@@ -36,10 +36,10 @@ def test_general_id_allows_underscore():
     # event/module/behavior ids may use underscores (only observable ids forbid '-')
     raw = {
         "bspecVersion": "0.1.0",
-        "module": {"id": "m", "summary": "underscore id fixture"},
-        "interfaces": [{"id": "io", "direction": "input"}],
+        "module": {"id": "m", "name": "M", "rationale": "underscore id fixture"},
+        "interfaces": [{"id": "io", "name": "IO", "direction": "input"}],
         "events": [
-            {"id": "order_created", "direction": "input", "interface": "io",
+            {"id": "order_created", "name": "Order created", "direction": "input", "interface": "io",
              "payloadSchema": {"type": "object", "additionalProperties": False}}
         ],
     }

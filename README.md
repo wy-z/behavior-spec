@@ -2,7 +2,9 @@
 
 Deterministic CLI for domain-neutral **Behavior Specs** — describe, review, and consume observable system behavior without describing implementation.
 
-See [`docs/spec-v1.md`](docs/spec-v1.md) for the normative specification.
+- Repository: <https://github.com/wy-z/behavior-spec>
+- Normative spec: [`docs/spec-v1.md`](docs/spec-v1.md)
+- JSON Schema (`$id` `https://wy-z.github.io/behavior-spec/v1/schema.json`): [`src/bspec/schemas/bspec.schema.json`](src/bspec/schemas/bspec.schema.json)
 
 ## Concepts
 
@@ -13,16 +15,18 @@ A Behavior Spec is written by a Code Agent; review state is written only by this
 ## Commands
 
 ```
-bspec init        # scaffold a project
+bspec init        # scaffold a project (--lang <code> sets language)
 bspec validate    # schema + reference + CEL type checks
 bspec review      # interactive review (only writer of bspec.json)
 bspec status      # per-kind / per-module review status
-bspec context     # export approved behavior for an agent
+bspec doc         # markdown + mermaid (flow / module diagrams) for GitHub/sharing
 ```
 
 ## Develop
 
 ```
+git clone https://github.com/wy-z/behavior-spec
+cd behavior-spec
 uv sync --extra dev
 uv run pytest
 uv run bspec --help

@@ -12,6 +12,9 @@ dependencies = [
     "cel-python==0.5.0",
     "rfc8785>=0.1.2",
     "rich>=15.0.0",
+    # Renders the derived mermaid diagrams in the review TUI. Output is cosmetic
+    # (never hashed), so a loose floor is fine — render churn can't move a hash.
+    "termaid>=0.7.1",
 ]
 
 [project.scripts]
@@ -19,6 +22,11 @@ bspec = "bspec.cli:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+
+[project.urls]
+Homepage = "https://github.com/wy-z/behavior-spec"
+Repository = "https://github.com/wy-z/behavior-spec"
+Issues = "https://github.com/wy-z/behavior-spec/issues"
 
 [build-system]
 requires = ["hatchling"]

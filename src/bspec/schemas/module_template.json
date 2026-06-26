@@ -1,10 +1,10 @@
 {
-  "$schema": "https://bspec.dev/0.1/schema.json",
+  "$schema": "https://wy-z.github.io/behavior-spec/v1/schema.json",
   "bspecVersion": "0.1.0",
   "module": {
     "id": "example",
-    "title": "Example module",
-    "summary": "Replace with a real, independently reviewable system capability."
+    "name": "Example module",
+    "rationale": "Replace with a real, independently reviewable system capability."
   },
   "glossary": {},
   "interfaces": [],

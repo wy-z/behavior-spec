@@ -70,13 +70,22 @@ def test_schema_subset_requires_additional_properties_false():
     assert "schema-subset" in _codes(checks.run(p), "error")
 
 
-def test_stub_summary_rejected():
-    # a summary that just echoes the title carries no explanation for the reviewer
+def test_stub_rationale_rejected():
+    # a rationale that just echoes the title carries no explanation for the reviewer
     p = _proj(behavior=[
-        {"id": "b", "title": "X", "summary": "X",
+        {"id": "b", "title": "X", "rationale": "X",
          "when": {"event": "e"}, "then": [{"assert": {"cel": "true"}}]},
     ])
-    assert "stub-summary" in _codes(checks.run(p), "error")
+    assert "stub-rationale" in _codes(checks.run(p), "error")
+
+
+def test_stub_name_rejected():
+    # a name that just repeats the id is no human label
+    p = _proj(behavior=[
+        {"id": "b", "name": "b", "title": "X", "rationale": "why X",
+         "when": {"event": "e"}, "then": [{"assert": {"cel": "true"}}]},
+    ])
+    assert "stub-name" in _codes(checks.run(p), "error")
 
 
 def test_schema_subset_requires_type():

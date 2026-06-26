@@ -1,10 +1,13 @@
 """Semantic hashing of review units.
 
-The hash covers the human-approved contract: CEL (canonicalized), referenced
-observable/event schemas (inlined), and the plain-language `summary` the reviewer
-actually approved. Cosmetic edits (formatting, `title`, `origin`, line numbers)
-never change it; any operator/operand/schema/summary change does. Module and flow
-hashes are membership/order + summary/glossary only (non-cascade) — see spec 13.4.
+The hash covers the human-approved contract: everything a layperson reads to
+decide. That is the prose they approve — the EARS `title` (the requirement) and
+the `rationale` (the why) — plus CEL (canonicalized) and the referenced
+observable/event meaning (schema + `description`, inlined). A layperson cannot
+read CEL, so the prose must be in the hash or an approval could outlive a
+requirement/meaning change. Cosmetic edits (formatting, `name`, `origin`, line
+numbers) never change it. Module and flow hashes are membership/order +
+title/rationale/glossary only (non-cascade) — see spec 13.4.
 """
 
 from __future__ import annotations
@@ -53,7 +56,8 @@ def _behavior_payload(proj: Project, sym: Symbol) -> dict:
     return {
         "kind": "behavior",
         "id": sym.id,
-        "summary": b.get("summary"),
+        "title": b.get("title"),
+        "rationale": b.get("rationale"),
         "given": _cel(b.get("given")),
         "when": {"event": when.get("event"), "where": _cel(when.get("where"))},
         "then": then,
@@ -70,7 +74,8 @@ def _invariant_payload(proj: Project, sym: Symbol) -> dict:
     return {
         "kind": "invariant",
         "id": sym.id,
-        "summary": inv.get("summary"),
+        "title": inv.get("title"),
+        "rationale": inv.get("rationale"),
         "while": _cel(inv.get("while")),
         "assert": _cel(inv.get("assert")),
         "deps": {"observables": _observable_deps(proj.kind("observable"), refs)},
@@ -78,13 +83,14 @@ def _invariant_payload(proj: Project, sym: Symbol) -> dict:
 
 
 def _flow_payload(proj: Project, sym: Symbol) -> dict:
-    return {"kind": "flow", "id": sym.id, "summary": sym.obj.get("summary"),
-            "steps": list(sym.obj.get("steps", []))}
+    return {"kind": "flow", "id": sym.id, "title": sym.obj.get("title"),
+            "rationale": sym.obj.get("rationale"), "steps": list(sym.obj.get("steps", []))}
 
 
 def _module_payload(proj: Project, sym: Symbol) -> dict:
     m = proj.module_members(sym.id)
-    return {"kind": "module", "id": sym.id, "summary": sym.obj.get("summary"),
+    return {"kind": "module", "id": sym.id, "title": sym.obj.get("title"),
+            "rationale": sym.obj.get("rationale"),
             "glossary": proj.glossary.get(sym.id, {}),
             "members": {"behaviors": m["behavior"], "invariants": m["invariant"], "flows": m["flow"]}}
 
@@ -97,6 +103,7 @@ def _event_deps(events, ids) -> dict:
             out[eid] = {
                 "direction": ev.obj.get("direction"),
                 "interface": ev.obj.get("interface"),
+                "description": ev.obj.get("description"),
                 "payloadSchema": ev.obj.get("payloadSchema"),
             }
     return out
@@ -107,7 +114,8 @@ def _observable_deps(observables, ids) -> dict:
     for oid in sorted(ids):
         ob = observables.get(oid)
         if ob is not None:
-            out[oid] = {"role": ob.obj.get("role"), "valueSchema": ob.obj.get("valueSchema")}
+            out[oid] = {"role": ob.obj.get("role"), "description": ob.obj.get("description"),
+                        "valueSchema": ob.obj.get("valueSchema")}
     return out
 
 

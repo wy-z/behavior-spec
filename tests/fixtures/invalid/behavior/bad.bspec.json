@@ -1,5 +1,5 @@
 {
-  "$schema": "https://bspec.dev/0.1/schema.json",
+  "$schema": "https://wy-z.github.io/behavior-spec/v1/schema.json",
   "bspecVersion": "0.1.0",
   "module": { "id": "bad" },
   "observables": [

@@ -24,7 +24,7 @@ Two hard boundaries:
 |---|---|
 | **module** | Human review boundary. NOT a code package. |
 | **interface** | Observable boundary where input is received or output produced. |
-| **observable** | A value/state/parameter/derived result a reviewer cares about. |
+| **observable** | A state value or parameter a reviewer cares about. |
 | **event** | An input or output occurring at a point in time. |
 | **behavior** | One rule: `given + when → then`. |
 | **invariant** | A condition that must always hold: `while → assert`. |
@@ -44,8 +44,7 @@ Anything a human must review **must** be modeled as an observable or an event. A
 └── skills/
     └── behavior-spec/        # Agent Skill (optional in repo)
         ├── SKILL.md
-        ├── references/
-        └── assets/
+        └── references/
 ```
 
 - The **project root is the nearest ancestor directory containing `bspec.json`** (`bspec` walks up from the cwd / given path to find it). Spec files are matched by `specGlobs` (default `**/*.bspec.json`) resolved relative to that root — a `behavior/` subdirectory is one convention, not a requirement.
@@ -61,7 +60,7 @@ One module per `*.bspec.json` file.
 
 ```json
 {
-  "$schema": "https://bspec.dev/0.1/schema.json",
+  "$schema": "https://wy-z.github.io/behavior-spec/v1/schema.json",
   "bspecVersion": "0.1.0",
   "module":      { },
   "glossary":    { },
@@ -76,7 +75,7 @@ One module per `*.bspec.json` file.
 
 Meta-schema: **JSON Schema Draft 2020-12**. Every object sets `"unevaluatedProperties": false`. Unknown fields fail validation (a misspelled `paylodSchema` is an error, never silently accepted).
 
-All `*.bspec.json` files share **one global namespace**; cross-file references resolve globally. (Module-scoped namespaces / `imports` are deferred to v0.2.) `glossary` is an optional `{ term: plain-language definition }` map for the file's shared vocabulary; it is surfaced in review cards and `bspec context`, and is part of the module's semantic hash.
+All `*.bspec.json` files share **one global namespace**; cross-file references resolve globally. (Module-scoped namespaces / `imports` are deferred to v0.2.) `glossary` is an optional `{ term: plain-language definition }` map for the file's shared vocabulary; it is surfaced in review cards and is part of the module's semantic hash.
 
 ---
 
@@ -112,50 +111,59 @@ Examples: `portfolio.gross_exposure`, `orders.count`, `navigation.current_page`.
 
 ## 5. Object field definitions (frozen)
 
-Normative fields are included in the semantic hash (§13). Cosmetic fields (`title`, observable `description`, `origin.note`) are **non-normative**. Every **review unit** (module/behavior/invariant/flow) requires a non-empty plain-language `summary`; because the reviewer approves from it, `summary` **is** part of the hash (editing it re-opens review). `glossary` (file-level) is likewise hashed into the module.
+Normative fields are included in the semantic hash (§13). `name` is a short human
+label — required on **every** object, **cosmetic** (not hashed): the tool prepends
+the raw `[kind][direction]` tag at display time, so the tag is never authored.
+`title` is the EARS requirement — **normative** (hashed), required on
+`behavior`/`invariant`, optional on `module`/`flow`. `rationale` is the why —
+required + **normative** on review units. Definition `description` is optional and
+hashed **when the definition is referenced** by a review unit (its meaning shapes
+that approval). `origin.note` is cosmetic. `glossary` (file-level) is hashed into
+the module.
 
 ### module
 ```json
-{ "id": "trading.ma-cross", "title": "…", "summary": "…" }
+{ "id": "trading.ma-cross", "name": "…", "title": "…", "rationale": "…" }
 ```
-`id` + `summary` required (`summary` non-empty, **normative**). `title` optional, non-normative.
+`id` + `name` + `rationale` required (`rationale` non-empty, **normative**). `title`
+optional (scope sentence; normative when present).
 
 ### glossary (file-level, optional)
 ```json
 "glossary": { "fresh": "approval still valid: stored hash == current hash", "…": "…" }
 ```
-A `{ term: plain-language definition }` map shared by the file's units. Surfaced in review cards and `bspec context`; part of the **module** semantic hash.
+A `{ term: plain-language definition }` map shared by the file's units. Surfaced in review cards; part of the **module** semantic hash.
 
 ### interface
 ```json
-{ "id": "trading.market-bars", "title": "…", "direction": "input", "protocol": "market-bar-stream" }
+{ "id": "trading.market-bars", "name": "…", "description": "…", "direction": "input", "protocol": "market-bar-stream" }
 ```
-`direction` ∈ `input | output | bidirectional`. `protocol` is an **open string** (not an enum): `ui|http|websocket|message-topic|market-bar-stream|broker-api|file|cli|schedule|…`.
+`id` + `name` + `direction` required. `direction` ∈ `input | output | bidirectional`. `description` optional (hashed when referenced). `protocol` is an **open string** (not an enum): `ui|http|websocket|message-topic|market-bar-stream|broker-api|file|cli|schedule|…`.
 
 ### observable
 ```json
-{ "id": "portfolio.gross_exposure", "title": "…", "role": "state", "valueSchema": { "type": "number", "minimum": 0 } }
+{ "id": "portfolio.gross_exposure", "name": "…", "role": "state", "valueSchema": { "type": "number", "minimum": 0 } }
 ```
-`role` ∈ `state | parameter | derived`. `valueSchema` is a restricted JSON Schema (§6).
-- `role: state` and `role: derived` → appear in `before` / `after` / `current` namespaces.
+`id` + `name` + `role` + `valueSchema` required. `role` ∈ `state | parameter`. `description` optional (hashed when referenced). `valueSchema` is a restricted JSON Schema (§6).
+- `role: state` → appears in `before` / `after` / `current` namespaces.
 - `role: parameter` → appears in `params` namespace.
 
 ### event
 ```json
-{ "id": "market.bar.closed", "title": "…", "direction": "input",
+{ "id": "market.bar.closed", "name": "…", "description": "…", "direction": "input",
   "interface": "trading.market-bars", "payloadSchema": { "type": "object", "additionalProperties": false, "required": [...], "properties": {...} } }
 ```
-`direction` ∈ `input | output`. `interface` must resolve; its direction must be compatible (`input` event ⇒ interface `input|bidirectional`; `output` event ⇒ interface `output|bidirectional`). `payloadSchema` must be a restricted object schema with `additionalProperties:false`.
+`id` + `name` + `direction` + `interface` + `payloadSchema` required. `direction` ∈ `input | output`. `interface` must resolve; its direction must be compatible (`input` event ⇒ interface `input|bidirectional`; `output` event ⇒ interface `output|bidirectional`). `payloadSchema` must be a restricted object schema with `additionalProperties:false`. `description` optional (hashed when referenced).
 
 ### behavior
 ```json
-{ "id": "trading.ma-cross.open-long", "title": "…", "summary": "…",
+{ "id": "trading.ma-cross.open-long", "name": "…", "title": "…", "rationale": "…",
   "given": { "cel": "…" },
   "when":  { "event": "market.bar.closed", "where": { "cel": "…" } },
   "then":  [ { "assert": { "cel": "…" } }, { "emit": { "event": "…", "where": { "cel": "…" } } }, { "forbid": { "event": "…" } } ],
-  "origin": [ { "kind": "code", "uri": "…", "lineStart": 40, "lineEnd": 78 } ] }
+  "origin": [ { "kind": "code", "uri": "…" } ] }
 ```
-- `summary` required (non-empty plain-language explanation; **normative** — §13).
+- `name` required (short label). `title` required (EARS requirement; **normative**). `rationale` required (non-empty why; **normative** — §13).
 - `given` optional (no precondition ⇒ omit).
 - `when` required: exactly **one** trigger `event` (must be an **input** event); `where` optional.
 - `then` required, **≥1 entry**; each entry is exactly one of `assert | emit | forbid`.
@@ -163,24 +171,24 @@ A `{ term: plain-language definition }` map shared by the file's units. Surfaced
 
 ### invariant
 ```json
-{ "id": "trading.risk.max-gross-exposure", "title": "…", "summary": "…",
+{ "id": "trading.risk.max-gross-exposure", "name": "…", "title": "…", "rationale": "…",
   "while":  { "cel": "…" },
   "assert": { "cel": "…" },
   "origin": [ … ] }
 ```
-`while` optional (always-hold ⇒ omit). `assert` + `summary` required (`summary` **normative**). `title` optional, non-normative.
+`name` + `title` + `rationale` + `assert` required (`title`/`rationale` **normative**). `while` optional (always-hold ⇒ omit).
 
 ### flow
 ```json
-{ "id": "trading.trade-cycle", "title": "…", "summary": "…", "steps": [ "behavior.id.a", "behavior.id.b" ] }
+{ "id": "trading.trade-cycle", "name": "…", "title": "…", "rationale": "…", "steps": [ "behavior.id.a", "behavior.id.b" ] }
 ```
-`steps` = ordered behavior ids (order **is** normative). `summary` required (**normative**). `title` optional, non-normative. Flows declare **no** new conditions, outputs, or rules.
+`name` + `rationale` + `steps` required (`steps` order **is** normative; `rationale` **normative**). `title` optional (normative when present). Flows declare **no** new conditions, outputs, or rules.
 
 ### origin (non-normative)
 ```json
-{ "kind": "code", "uri": "src/x.ts", "lineStart": 18, "lineEnd": 81, "note": "…" }
+{ "kind": "code", "uri": "src/x.ts", "note": "…" }
 ```
-`kind` ∈ `code | config | doc | runtime | human | inference`. Answers only "why did the Agent generate this", never "is the implementation correct".
+`kind` ∈ `code | config | doc | runtime | human | inference`. File-level provenance — answers only "why did the Agent generate this", never "is the implementation correct".
 
 ---
 
@@ -227,9 +235,9 @@ All expressions are **CEL** (parsed by celpy). Every expression must **parse**, 
 
 | Namespace | Contents |
 |---|---|
-| `before` | observables (role `state`/`derived`) before the event |
-| `after` | observables (role `state`/`derived`) after the behavior completes |
-| `current` | observables (role `state`/`derived`), for invariants |
+| `before` | observables (role `state`) before the event |
+| `after` | observables (role `state`) after the behavior completes |
+| `current` | observables (role `state`), for invariants |
 | `params` | observables (role `parameter`) |
 | `trigger` | the input event payload |
 | `emitted` | the expected output event payload |
@@ -312,7 +320,7 @@ v0.1 performs **no automated conflict detection** between CEL-predicated behavio
 - `behavior.when` without exactly one event; `behavior.then` empty.
 - `valueSchema`/`payloadSchema` uses a disallowed/unknown construct, an untyped node, an array without `items`, an object without `additionalProperties:false`, or a `required` entry absent from `properties` (§6).
 - CEL: parse error; result not `bool`; reference to an undeclared observable/param; reference to a nonexistent payload field; namespace not allowed in the clause; type error (incl. int/double literal mismatch).
-- A review unit `summary` missing/empty (meta-schema) or that merely repeats its `title`/`id` (stub-summary).
+- A review unit `rationale` missing/empty (meta-schema) or that merely repeats its `title`/`name`/`id` (stub-rationale); a `name` that merely repeats its `id` (stub-name).
 
 ### Warnings
 - Declared but never referenced: observable / event / interface.
@@ -348,7 +356,7 @@ Cross-file references are permitted in v0.1 (global namespace).
 
 ```json
 {
-  "$schema": "https://bspec.dev/0.1/review-state.schema.json",
+  "$schema": "https://wy-z.github.io/behavior-spec/v1/review-state.schema.json",
   "version": "0.1.0",
   "lang": "en",
   "specGlobs": [ "behavior/**/*.bspec.json" ],
@@ -367,16 +375,17 @@ Cross-file references are permitted in v0.1 (global namespace).
 - `decision` ∈ `approved | changes_requested | rejected | deferred`. **No `pending`/`stale` stored** — both are computed (§14).
 - `reviewedAt` = RFC 3339.
 - `comment` optional.
-- `lang` = language of all human-readable text (`title`/`summary`/`comment`) across the project's `*.bspec.json`; default `en`. Advisory metadata, surfaced in `bspec context`; not machine-enforced. Authors write descriptive text in this language.
+- `lang` = language of all human-readable text (`name`/`title`/`rationale`/`description`/`comment`) across the project's `*.bspec.json`; default `en`. Stored **only here**. Advisory metadata; not machine-enforced. Authors write that text in this language.
+- `glossary` (optional) = a project-level `{ type-word: localized }` map (`interface→接口`, `input→输入`, …). `bspec review` looks it up to localize the `[kind][direction]` tag it prepends to each unit's `name`; missing keys fall back to the raw word. **Not hashed** (cosmetic project config) — distinct from a module file's domain `glossary` (§5), which is hashed into the module.
 - **Reviewer identity is not stored** — git history is the authoritative record of who recorded each decision.
 - **Only `bspec review` writes this file.** The Agent never edits it and never writes a decision, hash, or time.
-- **Module records are scope-only.** A `module:<id>` record approves the module's membership/scope, **not** its rules. Rule-level approval is strictly per behavior/invariant. Consumers must obtain rules via `bspec context` (per item) and must never read `module:<id> == approved` as "the rules are approved".
+- **Module records are scope-only.** A `module:<id>` record approves the module's membership/scope, **not** its rules. Rule-level approval is strictly per behavior/invariant; `module:<id> == approved` must never be read as "the rules are approved".
 
 ---
 
 ## 13. Semantic hash (D6 + canonicalization — frozen)
 
-A review unit becomes stale when its **normative** content changes — including the human-approved `summary` (the reviewer approves from it, so it is part of the contract). Cosmetic changes (formatting, property order, `title`, observable `description`, `origin`, line numbers) must **not** invalidate an approval.
+A review unit becomes stale when its **normative** content changes — including the prose a layperson approves: the EARS `title` and the `rationale`, plus a referenced definition's `description` (its meaning shapes the approval). Cosmetic changes (formatting, property order, `name`, `origin`/`origin.note`) must **not** invalidate an approval.
 
 ### 13.1 CEL canonicalization
 Canonical CEL = a normalized **S-expression** emitted from the celpy Lark parse tree (parentheses unwrapped; whitespace/comments dropped by the grammar). String literals keep their raw text so distinct values can never collide. Cosmetic changes do not change the hash; any operator/operand change does. Because the tree is parser IR (not a stable AST), the celpy version is pinned and the canonicalizer is golden-tested.
@@ -385,30 +394,30 @@ Canonical CEL = a normalized **S-expression** emitted from the celpy Lark parse 
 
 **behavior**
 ```
-{ kind:"behavior", id, summary,
+{ kind:"behavior", id, title, rationale,
   given:  <canonCEL|null>,
   when:   { event, where:<canonCEL|null> },
   then:   [ ordered: {assert:<canonCEL>} | {emit:{event, where:<canonCEL|null>}} | {forbid:{event}} ],
   deps: {
-    events:      { <id>: { direction, interface, payloadSchema:<JCS> } },   // trigger + emit/forbid events
-    observables: { <id>: { role, valueSchema:<JCS> } }                      // every obs/param referenced by any CEL
+    events:      { <id>: { direction, interface, description, payloadSchema:<JCS> } },   // trigger + emit/forbid events
+    observables: { <id>: { role, description, valueSchema:<JCS> } }                      // every obs/param referenced by any CEL
   } }
 ```
-Referenced observables are found by extracting namespace paths from each CEL AST and resolving them (§7.2). Dependency `deps` keys are sorted.
+Referenced observables are found by extracting namespace paths from each CEL AST and resolving them (§7.2). Dependency `deps` keys are sorted. A referenced definition's `description` is inlined, so editing it re-opens the referencing unit. `name` is never in the payload (cosmetic).
 
-**invariant**: `{ kind:"invariant", id, summary, while:<canonCEL|null>, assert:<canonCEL>, deps:{observables} }`
+**invariant**: `{ kind:"invariant", id, title, rationale, while:<canonCEL|null>, assert:<canonCEL>, deps:{observables} }`
 
-**flow**: `{ kind:"flow", id, summary, steps:[ordered behavior ids] }` (non-cascade)
+**flow**: `{ kind:"flow", id, title, rationale, steps:[ordered behavior ids] }` (non-cascade; `title` null when absent)
 
-**module**: `{ kind:"module", id, summary, glossary:{term:def}, members:{ behaviors:[sorted], invariants:[sorted], flows:[sorted] } }` (members + summary + glossary only, non-cascade)
+**module**: `{ kind:"module", id, title, rationale, glossary:{term:def}, members:{ behaviors:[sorted], invariants:[sorted], flows:[sorted] } }` (members + title/rationale + glossary only, non-cascade; `title` null when absent)
 
 ### 13.3 Hash
 `semanticHash = "sha256:" + hex( SHA-256( JCS(payload, UTF-8) ) )`, where JCS = RFC 8785 JSON Canonicalization Scheme.
 
 ### 13.4 Why non-cascade for module/flow
-A behavior change makes **that behavior** stale on its own. Module/flow hashes track only membership/order, so module/flow review = scope/sequence review and does not double-churn on every rule edit. Safety is preserved because export and staleness are gated **per item** (§14, §16), so a fresh module never implies its rules are fresh — `bspec status` surfaces a per-module rollup of contained pending/stale items for visibility.
+A behavior change makes **that behavior** stale on its own. Module/flow hashes track only membership/order, so module/flow review = scope/sequence review and does not double-churn on every rule edit. Safety is preserved because staleness is tracked **per item** (§14), so a fresh module never implies its rules are fresh — `bspec status` surfaces a per-module rollup of contained pending/stale items for visibility.
 
-> **Consensus note (codex, 2 rounds).** Cascade (module hash including member hashes) was initially proposed by the second opinion. It was **conceded as unnecessary** once module approval is given the narrow scope-only semantics above, combined with the mandatory `status` rollup and the per-item export gate — these fully address the "misleading freshness" risk without re-opening a module on every rule edit.
+> **Consensus note (codex, 2 rounds).** Cascade (module hash including member hashes) was initially proposed by the second opinion. It was **conceded as unnecessary** once module approval is given the narrow scope-only semantics above, combined with the mandatory `status` rollup and per-item staleness — these fully address the "misleading freshness" risk without re-opening a module on every rule edit.
 
 ---
 
@@ -437,8 +446,8 @@ Supporting definitions (interface, observable, event) are **not** reviewed direc
 
 All commands are **fully deterministic — no LLM, no network for core ops**.
 
-### `bspec init [path]`
-Scaffold in `path` (default cwd): `bspec.json` (empty `reviews`, `specGlobs: ["**/*.bspec.json"]`) and an `example.bspec.json` from the module template, side by side. The directory holding `bspec.json` becomes the project root. Does not overwrite existing files.
+### `bspec init [path] [--lang <code>]`
+Scaffold in `path` (default cwd): `bspec.json` (`lang` = `--lang`, default `en`; empty `reviews`, `specGlobs: ["**/*.bspec.json"]`) and an `example.bspec.json` from the module template, side by side. For a non-English `--lang`, also pre-fills `bspec.json`'s `glossary` with the type words as English placeholders to translate (§12). The directory holding `bspec.json` becomes the project root. Does not overwrite existing files.
 
 ### `bspec validate [--json] [--strict]`
 §10. Human output:
@@ -451,34 +460,22 @@ Scaffold in `path` (default cwd): `bspec.json` (empty `reviews`, `specGlobs: ["*
 ```
 
 ### `bspec review [--module <id>] [--kind behavior|invariant|flow|module] [--status pending|stale|approved|changes_requested|rejected|deferred]`
-Interactive prompt (stdlib `input`). Review card shows title, summary, GIVEN / WHEN / SYSTEM MUST / ORIGIN in human-readable form. Keys: `[a]` approve, `[c]` request changes (collects a comment), `[r]` reject, `[d]` defer, `[o]` open origin, `[q]` quit. Writes decisions (with current `semanticHash`, `reviewedAt`, optional `comment`) to `bspec.json`. **This is the only command that writes `bspec.json`.**
+Interactive `rich` prompt. The review card shows the `[kind][direction]` typed `name`, the EARS `title`, the `rationale`, the rule (GIVEN / WHEN / MUST), referenced terms, glossary, and — for flow/module — a derived diagram (flow pipeline / module I/O), all in human-readable form. Keys: `[a]` approve, `[c]` request changes (collects a comment), `[r]` reject, `[d]` defer, `[o]` open origin, `[q]` quit. Writes decisions (with current `semanticHash`, `reviewedAt`, optional `comment`) to `bspec.json`. **This is the only command that writes `bspec.json`.**
+
+### `bspec doc [--module <id>]`
+Markdown + `mermaid` export (read-only) for sharing / GitHub: per module a context graph, each flow as a pipeline, and behaviors/invariants as rule text. Diagrams are **derived** from structure (`steps`, `interface`/`direction`); there is no diagram field to author.
 
 ### `bspec status [--json]`
 Counts per kind per status, including computed `pending`/`stale`, plus a per-module rollup of contained item statuses.
-
-### `bspec context --module <id> [--approved] [--json]`
-Export for the Code Agent. With `--approved`, includes only items that are **individually approved AND fresh** (per-item gate — module staleness never blocks an approved-fresh behavior):
-```json
-{
-  "module": { "id": "trading.ma-cross", "title": "…", "summary": "…" },
-  "lang": "en",
-  "glossary": { "term": "definition", "…": "…" },
-  "behaviors":  [ /* full approved+fresh behavior objects */ ],
-  "invariants": [ /* full approved+fresh invariant objects */ ],
-  "dependencies": { "interfaces": [], "events": [], "observables": [] },
-  "flows": [ /* full objects; a flow ships only when it AND every step are approved+fresh */ ]
-}
-```
-With `--approved`, a **flow** is exported only when the flow itself and **every** step is approved+fresh; a partially-approved flow is omitted entirely (no step filtering). Without `--approved`, every item is included with a `reviewStatus` field. The Agent must never treat `pending|stale|rejected|changes_requested|deferred` items as implementation targets.
 
 ---
 
 ## 17. Agent Skill (outline)
 
-`skills/behavior-spec/` with `SKILL.md` + `references/` + `assets/module-template.bspec.json`.
+`skills/behavior-spec/` with `SKILL.md` + `references/`.
 
 Responsibilities (Agent) vs the tool/human:
-- **Agent**: scan project, create module stubs, generate/revise behaviors & invariants, run `bspec validate`, respond to `changes_requested`, remove `rejected` items, consume `bspec context --approved`.
+- **Agent**: scan project, create module stubs, generate/revise behaviors & invariants, run `bspec validate`, respond to `changes_requested`, remove `rejected` items, implement directly from the spec files.
 - **Agent must NOT**: write/modify any review record, mark anything approved, change a semantic hash, hide validation errors, silently replace an approved behavior, encode implementation choices as observable behavior, or treat current source as intended behavior without human review.
 
 Closed loop:
@@ -486,7 +483,7 @@ Closed loop:
 1. Agent scans project        →  2. Agent writes module stubs   →  3. bspec validate
 4. Human reviews modules      →  5. Agent generates behaviors    →  6. bspec validate
 7. Human reviews behaviors/invariants  →  8. Agent fixes changes_requested  →  9. Human re-reviews
-10. Agent builds via `bspec context --approved`  →  11. New requirement = edit spec first, then code
+10. Agent implements from the spec files  →  11. New requirement = edit spec first, then code
 ```
 
 ---
@@ -516,17 +513,16 @@ src/bspec/
 ├── hashing.py      # normative extraction + canonical CEL + JCS + sha256 (module/flow non-cascade)
 ├── status.py       # pending/stale derivation + per-module rollup
 ├── review.py       # bspec.json read/write + interactive review (sole writer)
-├── context.py      # approved-context export (per-item gate)
-├── cli.py          # argparse: init / validate / review / status / context
+├── cli.py          # argparse: init / validate / review / status / doc
 └── schemas/        # bspec.schema.json, review_state.schema.json, module_template.json
-tests/              # schema, loader, checks, expression (CEL), hashing (golden+stability), review+status+context
+tests/              # schema, loader, checks, expression (CEL), hashing (golden+stability), review+status
 ```
 
 ---
 
 ## 19. Frozen decisions & deltas
 
-> All core decisions were validated against a codex second opinion over two rounds. **D1** was reshaped in round 1 (nested CEL types via TypeProvider, not manual prefix-matching). **D5** (`overrides`) was subsequently **deferred to v0.2** and removed from the schema. **D6** stands non-cascade — codex initially favored cascade, then conceded it unnecessary in round 2. **P2/P4** confirmed in round 2. A later review-ergonomics round (also codex-reviewed) made `summary` required and part of the hash, added a file-level `glossary`, tightened schema typing, gated flow export, and removed the inert `participants`/`imports`/`overrides`. All rows below are consensus.
+> All core decisions were validated against a codex second opinion over two rounds. **D1** was reshaped in round 1 (nested CEL types via TypeProvider, not manual prefix-matching). **D5** (`overrides`) was subsequently **deferred to v0.2** and removed from the schema. **D6** stands non-cascade — codex initially favored cascade, then conceded it unnecessary in round 2. **P2/P4** confirmed in round 2. A later review-ergonomics round (also codex-reviewed) made the reviewer-facing prose required and part of the hash, added a file-level `glossary`, tightened schema typing, gated flow export, and removed the inert `participants`/`imports`/`overrides`. A final field-model round (codex-consensus) added a required cosmetic `name` (tool-derived `[kind][direction]` tag), renamed `summary`→`rationale`, made `title` a hashed requirement (required on behavior/invariant), hashed referenced-definition `description`, dropped `origin` line numbers, and removed observable `role: derived`. All rows below are consensus.
 
 | # | Decision | Resolution |
 |---|---|---|
@@ -535,18 +531,17 @@ tests/              # schema, loader, checks, expression (CEL), hashing (golden+
 | D3 | No execution engine | Validate/typecheck only; `after` typed like `before`; temporal satisfiability unchecked. |
 | D4 | emit/then semantics | `then` = conjunction; `emit` = ≥1 matching output; `forbid` = event-type-level (no `where`). |
 | D5 | overrides | **Deferred to v0.2**; removed from the v0.1 schema (was inert metadata). |
-| D6 | module/flow hash | Members/order + `summary`/`glossary` only (non-cascade), scope-only module approval; per-item export & staleness gate; `status` rollup for visibility. (codex-converged) |
+| D6 | module/flow hash | Members/order + `title`/`rationale`/`glossary` only (non-cascade), scope-only module approval; per-unit staleness drives incremental review; `status` rollup for visibility. (codex-converged) |
 | — | Nullability | No null type; `required` + CEL `has()`. |
 | — | Numeric literals | `integer→int`, `number→double`; **narrow literal widening** (int-literal→double); strict for variables; `int()/double()` to bridge. |
 | — | Discriminated unions | Decompose into one closed event/observable per variant; verbatim legacy polymorphic payloads deferred to v0.2 (`dyn`). |
 | — | Hash canonicalization | CEL = normalized S-expr from the celpy parse tree; payload = JCS (RFC 8785) + SHA-256. |
 | — | Dependency staleness | Propagates automatically through referenced schemas in the behavior hash. |
-| — | Namespaces | `before/after/current` = state+derived; `params` = parameter; per-clause matrix enforced. |
+| — | Namespaces | `before/after/current` = state; `params` = parameter; per-clause matrix enforced. |
 | — | Reviewer identity | Not stored; git history is the record of who decided. |
-| — | Descriptive-text language | `bspec.json.lang` (default `en`); advisory, surfaced in `context`; authors follow it. |
-| — | Review summary | Every review unit needs a non-empty plain-language `summary`; it is **in the semantic hash** (the reviewer approves from it). A stub (== `title`/`id`) = ERROR. |
-| — | Glossary | Optional file-level `{term:def}`; surfaced in cards + `context`; part of the **module** hash. |
-| — | Flow export | `--approved` ships a flow only if it AND every step are approved+fresh; otherwise omitted (no step filtering). |
+| — | Descriptive-text language | `bspec.json.lang` (default `en`); advisory; authors follow it. |
+| — | name / title / rationale | Every object has a short `name` (cosmetic; tool prepends `[kind][direction]`). Review units need a `title` (EARS requirement) and `rationale` (why), both **in the semantic hash**. Stub `rationale` (== title/name/id) or stub `name` (== id) = ERROR. |
+| — | Glossary | Optional file-level `{term:def}`; surfaced in cards; part of the **module** hash. |
 | — | Schema strictness | Schema nodes must declare `type`; unknown keywords, missing array `items`, and `required` not-in-`properties` are ERRORs (no silent `dyn`). |
 | — | participants / imports | **Removed** from the v0.1 schema (were inert); global namespace remains. |
 
@@ -564,10 +559,9 @@ tests/              # schema, loader, checks, expression (CEL), hashing (golden+
 - [ ] Every CEL expression parses, type-checks against the §7.2 nested types, and must return `bool`; the §7.3 whitelist is enforced.
 - [ ] Numeric literal widening applied (integer-literal→double, literals only); variable-vs-variable int/double mismatch still ERRORs.
 - [ ] `then` conjunction, `emit` ≥1, `forbid` event-level, one-trigger/one-reaction all enforced.
-- [ ] Every review unit has a non-empty `summary` (in the hash); stub summaries (== title/id) rejected; file-level `glossary` surfaced in cards + `context`.
-- [ ] Semantic hash is stable under formatting / `title` / `origin` / line-number changes, and changes under any normative edit (CEL operand, referenced schema, `summary`, module/flow membership).
+- [ ] Every object has a `name`; review units have `title` + `rationale` (both in the hash); stub `rationale` (== title/name/id) and stub `name` (== id) rejected; file-level `glossary` surfaced in cards.
+- [ ] Semantic hash is stable under formatting / `name` / `origin` changes, and changes under any normative edit (`title`, `rationale`, CEL operand, referenced schema or `description`, module/flow membership).
 - [ ] `pending`/`stale` derived correctly; dependency-schema change marks dependents stale.
-- [ ] `bspec init|validate|review|status|context` behave per §16; only `review` writes `bspec.json`.
-- [ ] `context --approved` gates per item; module staleness never blocks an approved-fresh behavior.
+- [ ] `bspec init|validate|review|status|doc` behave per §16; only `review` writes `bspec.json`.
 - [ ] No LLM and no network in any core command.
 ```
