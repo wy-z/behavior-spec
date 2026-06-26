@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bspec.dev/0.1/review-state.schema.json",
+  "title": "bspec review state (bspec.json)",
+  "type": "object",
+  "required": ["version", "reviews"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "const": "0.1.0" },
+    "lang": { "type": "string", "default": "en" },
+    "specGlobs": { "type": "array", "items": { "type": "string" } },
+    "reviews": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/review" }
+    }
+  },
+  "unevaluatedProperties": false,
+  "$defs": {
+    "review": {
+      "type": "object",
+      "required": ["semanticHash", "decision", "reviewedAt"],
+      "properties": {
+        "semanticHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "decision": {
+          "type": "string",
+          "enum": ["approved", "changes_requested", "rejected", "deferred"]
+        },
+        "reviewedAt": { "type": "string" },
+        "comment": { "type": "string" }
+      },
+      "unevaluatedProperties": false
+    }
+  }
+}

@@ -1,0 +1,122 @@
+{
+  "$schema": "https://bspec.dev/0.1/schema.json",
+  "bspecVersion": "0.1.0",
+  "module": {
+    "id": "trading.ma-cross",
+    "title": "Moving Average Cross Strategy",
+    "summary": "Produces order intent from moving-average crossovers."
+  },
+  "interfaces": [
+    { "id": "trading.market-bars", "title": "Market Bar Feed", "direction": "input", "protocol": "market-bar-stream" },
+    { "id": "trading.broker-orders", "title": "Broker Order Gateway", "direction": "output", "protocol": "broker-api" }
+  ],
+  "observables": [
+    { "id": "session.open", "title": "Session Open", "role": "state", "valueSchema": { "type": "boolean" } },
+    { "id": "position.quantity", "title": "Position Quantity", "role": "state", "valueSchema": { "type": "integer" } },
+    { "id": "portfolio.gross_exposure", "title": "Gross Exposure", "role": "state", "valueSchema": { "type": "number", "minimum": 0 } },
+    { "id": "strategy.enabled", "title": "Strategy Enabled", "role": "state", "valueSchema": { "type": "boolean" } },
+    { "id": "risk.max_order_notional", "title": "Max Order Notional", "role": "parameter", "valueSchema": { "type": "number", "minimum": 0 } },
+    { "id": "risk.max_gross_exposure", "title": "Max Gross Exposure", "role": "parameter", "valueSchema": { "type": "number", "minimum": 0 } }
+  ],
+  "events": [
+    {
+      "id": "market.bar.closed",
+      "title": "Market Bar Closed",
+      "direction": "input",
+      "interface": "trading.market-bars",
+      "payloadSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["symbol", "close", "fast_ma", "slow_ma", "previous_fast_ma", "previous_slow_ma"],
+        "properties": {
+          "symbol": { "type": "string" },
+          "close": { "type": "number" },
+          "fast_ma": { "type": "number" },
+          "slow_ma": { "type": "number" },
+          "previous_fast_ma": { "type": "number" },
+          "previous_slow_ma": { "type": "number" }
+        }
+      }
+    },
+    {
+      "id": "broker.order.requested",
+      "title": "Broker Order Requested",
+      "direction": "output",
+      "interface": "trading.broker-orders",
+      "payloadSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["symbol", "side", "notional"],
+        "properties": {
+          "symbol": { "type": "string" },
+          "side": { "type": "string", "enum": ["BUY", "SELL"] },
+          "notional": { "type": "number", "exclusiveMinimum": 0 }
+        }
+      }
+    }
+  ],
+  "behaviors": [
+    {
+      "id": "trading.ma-cross.open-long",
+      "title": "Open long after bullish MA crossover",
+      "summary": "When the market is open and we hold no position, and the fast moving average has just crossed above the slow one at this bar's close, place a BUY order.",
+      "given": { "cel": "before.session.open && before.position.quantity == 0" },
+      "when": {
+        "event": "market.bar.closed",
+        "where": { "cel": "trigger.fast_ma > trigger.slow_ma && trigger.previous_fast_ma <= trigger.previous_slow_ma" }
+      },
+      "then": [
+        {
+          "emit": {
+            "event": "broker.order.requested",
+            "where": { "cel": "emitted.symbol == trigger.symbol && emitted.side == 'BUY' && emitted.notional <= params.risk.max_order_notional" }
+          }
+        }
+      ],
+      "origin": [
+        { "kind": "code", "uri": "strategies/ma_cross.py", "lineStart": 73, "lineEnd": 116 }
+      ]
+    },
+    {
+      "id": "trading.ma-cross.close-long",
+      "title": "Close long after bearish MA crossover",
+      "summary": "When we hold a long position and the fast moving average has just crossed below the slow one at this bar's close, place a SELL order to exit.",
+      "given": { "cel": "before.position.quantity > 0" },
+      "when": {
+        "event": "market.bar.closed",
+        "where": { "cel": "trigger.fast_ma < trigger.slow_ma && trigger.previous_fast_ma >= trigger.previous_slow_ma" }
+      },
+      "then": [
+        {
+          "emit": {
+            "event": "broker.order.requested",
+            "where": { "cel": "emitted.symbol == trigger.symbol && emitted.side == 'SELL'" }
+          }
+        }
+      ],
+      "origin": [
+        { "kind": "code", "uri": "strategies/ma_cross.py", "lineStart": 118, "lineEnd": 150 }
+      ]
+    }
+  ],
+  "invariants": [
+    {
+      "id": "trading.risk.max-gross-exposure",
+      "title": "Gross exposure stays within the configured limit",
+      "summary": "Whenever the strategy is enabled, total gross exposure must never exceed the configured maximum.",
+      "while": { "cel": "current.strategy.enabled" },
+      "assert": { "cel": "current.portfolio.gross_exposure <= params.risk.max_gross_exposure" },
+      "origin": [
+        { "kind": "code", "uri": "src/risk/exposure.py", "lineStart": 14, "lineEnd": 49 }
+      ]
+    }
+  ],
+  "flows": [
+    {
+      "id": "trading.trade-cycle",
+      "title": "Trading decision cycle",
+      "summary": "The end-to-end decision sequence per bar: first consider opening a long, then consider closing it.",
+      "steps": ["trading.ma-cross.open-long", "trading.ma-cross.close-long"]
+    }
+  ]
+}

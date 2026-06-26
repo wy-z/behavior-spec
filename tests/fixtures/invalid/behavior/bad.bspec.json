@@ -1,0 +1,8 @@
+{
+  "$schema": "https://bspec.dev/0.1/schema.json",
+  "bspecVersion": "0.1.0",
+  "module": { "id": "bad" },
+  "observables": [
+    { "id": "x.y", "role": "state", "valueSchema": { "type": "number" }, "extra": true }
+  ]
+}

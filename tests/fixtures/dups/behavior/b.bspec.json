@@ -1,0 +1,7 @@
+{
+  "bspecVersion": "0.1.0",
+  "module": { "id": "m.b", "summary": "Duplicate-id fixture B." },
+  "observables": [
+    { "id": "shared.x", "role": "state", "valueSchema": { "type": "number" } }
+  ]
+}
