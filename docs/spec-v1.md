@@ -447,7 +447,7 @@ Supporting definitions (interface, observable, event) are **not** reviewed direc
 All commands are **fully deterministic — no LLM, no network for core ops**.
 
 ### `bspec init [path] [--lang <code>]`
-Scaffold in `path` (default cwd): `bspec.json` (`lang` = `--lang`, default `en`; empty `reviews`, `specGlobs: ["**/*.bspec.json"]`) and an `example.bspec.json` from the module template, side by side. For a non-English `--lang`, also pre-fills `bspec.json`'s `glossary` with the type words as English placeholders to translate (§12). The directory holding `bspec.json` becomes the project root. Does not overwrite existing files.
+Scaffold in `path` (default cwd): `bspec.json` (`lang` = `--lang`, default `en`; empty `reviews`, `specGlobs: ["**/*.bspec.json"]`). For a non-English `--lang`, also pre-fills `bspec.json`'s `glossary` with the type words as English placeholders to translate (§12). The directory holding `bspec.json` becomes the project root. Does not overwrite existing files.
 
 ### `bspec validate [--json] [--strict]`
 §10. Human output:
@@ -514,7 +514,7 @@ src/bspec/
 ├── status.py       # pending/stale derivation + per-module rollup
 ├── review.py       # bspec.json read/write + interactive review (sole writer)
 ├── cli.py          # argparse: init / validate / review / status / doc
-└── schemas/        # bspec.schema.json, review_state.schema.json, module_template.json
+└── schemas/        # bspec.schema.json, review_state.schema.json
 tests/              # schema, loader, checks, expression (CEL), hashing (golden+stability), review+status
 ```
 

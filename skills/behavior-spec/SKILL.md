@@ -59,8 +59,8 @@ behaviors/invariants are `approved`, and which are `pending`, `stale`, or
 ## Module discovery (when no specs exist yet)
 
 1. **Ask the human which language** the specs should be written in, then
-   `bspec init [<dir>] --lang <code>` to scaffold `bspec.json` + an example spec
-   into `<dir>` (default cwd; e.g. `bspec init docs/behavior` to keep specs there).
+   `bspec init [<dir>] --lang <code>` to scaffold `bspec.json` into `<dir>`
+   (default cwd; e.g. `bspec init docs/behavior` to keep specs there).
    For a non-English `lang`, `init` pre-fills the type-word `glossary` with English
    placeholders — **translate each value** (e.g. `"interface": "接口"`); see
    *Source of truth* for how the tool uses them.

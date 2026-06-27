@@ -10,7 +10,7 @@ import json
 import os
 import sys
 
-from . import doc, loader, review, schema, status
+from . import doc, loader, review, status
 from .model import REVIEW_STATE_FILENAME, Diagnostic, Project
 
 
@@ -80,39 +80,26 @@ _TYPE_TOKENS = ("module", "behavior", "invariant", "flow", "interface", "event",
 def cmd_init(args: argparse.Namespace) -> int:
     root = os.path.abspath(args.path or os.getcwd())
     os.makedirs(root, exist_ok=True)
-    created: list[str] = []
 
     review_state = os.path.join(root, REVIEW_STATE_FILENAME)
-    if not os.path.exists(review_state):
-        state = {
-            "$schema": "https://wy-z.github.io/behavior-spec/v1/review-state.schema.json",
-            "version": "0.1.0",
-            "lang": args.lang,
-        }
-        if args.lang != "en":
-            state["glossary"] = {t: t for t in _TYPE_TOKENS}
-        state["specGlobs"] = ["**/*.bspec.json"]
-        state["reviews"] = {}
-        with open(review_state, "w", encoding="utf-8") as f:
-            json.dump(state, f, indent=2)
-            f.write("\n")
-        created.append(REVIEW_STATE_FILENAME)
-
-    existing = [f for f in os.listdir(root) if f.endswith(".bspec.json")]
-    if not existing:
-        template = schema.load_embedded("module_template.json")
-        example = os.path.join(root, "example.bspec.json")
-        with open(example, "w", encoding="utf-8") as f:
-            json.dump(template, f, indent=2)
-            f.write("\n")
-        created.append("example.bspec.json")
-
-    if created:
-        print("Initialized bspec project. Created:")
-        for c in created:
-            print(f"  {c}")
-    else:
+    if os.path.exists(review_state):
         print("bspec project already initialized; nothing to do.")
+        return 0
+
+    state = {
+        "$schema": "https://wy-z.github.io/behavior-spec/v1/review-state.schema.json",
+        "version": "0.1.0",
+        "lang": args.lang,
+    }
+    if args.lang != "en":
+        state["glossary"] = {t: t for t in _TYPE_TOKENS}
+    state["specGlobs"] = ["**/*.bspec.json"]
+    state["reviews"] = {}
+    with open(review_state, "w", encoding="utf-8") as f:
+        json.dump(state, f, indent=2)
+        f.write("\n")
+
+    print(f"Initialized bspec project. Created {REVIEW_STATE_FILENAME}")
     return 0
 
 
