@@ -188,23 +188,26 @@ def _flow_box(proj: Project, fid: str):
 
 
 def _io_table(proj: Project, oid: str, labels: dict):
-    """Compact boundary I/O for a module: which events enter and leave, via which
-    interface. Stands in for the (wide) mermaid context graph inside the terminal;
-    `bspec doc` emits that graph for GitHub. Both derive from diagram.module_io."""
+    """The module's boundary: one row per event crossing it (inputs first, then
+    outputs), with the event's id and the `from`/`to` interface it crosses. The
+    interface shows only as that dim channel — a reviewer judges the events, so the
+    title names just them. The precise typed contract (payload schemas) is the
+    agent's view via `bspec doc` (diagram.module_mermaid), not this card."""
     edges = diagram.module_io(proj, proj.get("module", oid))
     if not edges:
         return None
-    t = _section(lines=True)
-    t.add_column(style="dim", no_wrap=True)
-    t.add_column(style="cyan", overflow="fold")
-    t.add_column(style="yellow", overflow="fold")
-    for d, arrow in (("input", "in →"), ("output", "out ←")):
-        for e in [x for x in edges if x.direction == d]:
-            iface, ev = proj.get("interface", e.interface), proj.get("event", e.event)
-            iname = _typed_name("interface", iface.obj, e.interface, labels) if iface else e.interface
-            ename = _typed_name("event", ev.obj, e.event, labels) if ev else e.event
-            t.add_row(arrow, Text(iname), Text(ename))
-    return _titled("I/O", t)
+    t = _section(header=True, lines=True)
+    t.add_column("name", overflow="fold")
+    t.add_column("id", style="dim", no_wrap=True)
+    t.add_column("interface", style="dim", no_wrap=True)
+    for d in ("input", "output"):
+        prep = labels.get("from", "from") if d == "input" else labels.get("to", "to")
+        for e in (x for x in edges if x.direction == d):
+            ev, iface = proj.get("event", e.event), proj.get("interface", e.interface)
+            ename = (ev.obj.get("name") or e.event) if ev else e.event
+            iname = (iface.obj.get("name") or e.interface) if iface else e.interface
+            t.add_row(Text(ename), e.event, f"{prep} {iname}")
+    return _titled(labels.get("event", "event"), t)
 
 
 def _members_table(proj: Project, oid: str, units: dict, labels: dict):
