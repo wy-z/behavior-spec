@@ -8,10 +8,10 @@ with the `bspec` CLI.
 | Object | Purpose |
 |---|---|
 | `module` | Human review boundary (NOT a code package). |
-| `interface` | Observable boundary; `direction` input/output/bidirectional; open-string `protocol`. |
+| `interface` | Observable boundary; `direction` input/output/bidirectional. |
 | `observable` | A reviewable value; `role` state/parameter; restricted `valueSchema`. |
 | `event` | Input or output at a point in time; `direction`; `interface` ref; `payloadSchema`. |
-| `behavior` | `given` + `when` → `then`. One trigger event, one business reaction. |
+| `behavior` | `given` + `when` → `then`; optional `actor` (who initiates). One trigger event, one business reaction. |
 | `invariant` | `while` → `assert`; must always hold. |
 | `flow` | Ordered behavior ids; navigation only, non-normative. |
 | `origin` | Why the agent derived a spec (file-level); review metadata, non-normative. |

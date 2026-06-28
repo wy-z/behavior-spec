@@ -1,6 +1,6 @@
 {
   "$schema": "https://wy-z.github.io/behavior-spec/v1/schema.json",
-  "bspecVersion": "0.1.0",
+  "bspecVersion": "v1",
   "module": {
     "id": "trading.ma-cross",
     "name": "MA-cross strategy",
@@ -8,21 +8,22 @@
     "rationale": "Produces order intent from moving-average crossovers."
   },
   "interfaces": [
-    { "id": "trading.market-bars", "name": "Market bar feed", "direction": "input", "protocol": "market-bar-stream" },
-    { "id": "trading.broker-orders", "name": "Broker order gateway", "direction": "output", "protocol": "broker-api" }
+    { "id": "trading.market-bars", "name": "Market bar feed", "direction": "input" },
+    { "id": "trading.broker-orders", "name": "Broker order gateway", "direction": "output" }
   ],
   "observables": [
-    { "id": "session.open", "name": "Session open", "role": "state", "valueSchema": { "type": "boolean" } },
-    { "id": "position.quantity", "name": "Position quantity", "role": "state", "valueSchema": { "type": "integer" } },
-    { "id": "portfolio.gross_exposure", "name": "Gross exposure", "role": "state", "valueSchema": { "type": "number", "minimum": 0 } },
-    { "id": "strategy.enabled", "name": "Strategy enabled", "role": "state", "valueSchema": { "type": "boolean" } },
-    { "id": "risk.max_order_notional", "name": "Max order notional", "role": "parameter", "valueSchema": { "type": "number", "minimum": 0 } },
-    { "id": "risk.max_gross_exposure", "name": "Max gross exposure", "role": "parameter", "valueSchema": { "type": "number", "minimum": 0 } }
+    { "id": "session.open", "name": "Session open", "description": "Whether the trading session is currently open.", "role": "state", "valueSchema": { "type": "boolean" } },
+    { "id": "position.quantity", "name": "Position quantity", "description": "Net units held in the instrument; 0 means flat.", "role": "state", "valueSchema": { "type": "integer" } },
+    { "id": "portfolio.gross_exposure", "name": "Gross exposure", "description": "Total absolute market exposure across all open positions.", "role": "state", "valueSchema": { "type": "number", "minimum": 0 } },
+    { "id": "strategy.enabled", "name": "Strategy enabled", "description": "Whether this strategy is allowed to trade.", "role": "state", "valueSchema": { "type": "boolean" } },
+    { "id": "risk.max_order_notional", "name": "Max order notional", "description": "Configured cap on the notional value of a single order.", "role": "parameter", "valueSchema": { "type": "number", "minimum": 0 } },
+    { "id": "risk.max_gross_exposure", "name": "Max gross exposure", "description": "Configured cap on total gross exposure.", "role": "parameter", "valueSchema": { "type": "number", "minimum": 0 } }
   ],
   "events": [
     {
       "id": "market.bar.closed",
       "name": "Bar closed",
+      "description": "A market-data bar has closed, carrying its close price and fast/slow moving averages.",
       "direction": "input",
       "interface": "trading.market-bars",
       "payloadSchema": {
@@ -42,6 +43,7 @@
     {
       "id": "broker.order.requested",
       "name": "Order requested",
+      "description": "An order the strategy asks the broker to place.",
       "direction": "output",
       "interface": "trading.broker-orders",
       "payloadSchema": {

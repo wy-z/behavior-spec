@@ -83,12 +83,17 @@ For each behavior:
 5. Put every required result in `then` — each entry is exactly one of
    `assert` / `emit` / `forbid`; all entries are mandatory (AND).
 6. Reference only declared observables, parameters, events, interfaces.
-7. Record one or more `origin` entries (where you derived it).
+7. Optionally record `origin` entries (non-normative provenance — where you derived it).
 8. Keep the machine-checkable constraint in CEL/schema — `title`/`rationale` state
    the rule for humans (both hashed), but must never be the *only* place a
    constraint lives.
 9. If the code is ambiguous, do **not** invent intent — leave the behavior out
    or describe the ambiguity in an `origin.note`, and tell the user.
+
+Optionally set `actor` — who initiates the rule (a human role, external system, or
+scheduler) — and define that term in the file `glossary`. It scopes *who* the
+requirement is about for review; omit it for actorless rules. It is hashed when
+present, so editing it re-opens review.
 
 After writing files: `bspec validate --json`, and fix **every** error before review.
 

@@ -53,7 +53,7 @@ def _behavior_payload(proj: Project, sym: Symbol) -> dict:
             then.append({"forbid": {"event": entry["forbid"].get("event")}})
 
     refs = expression.referenced_observables(proj, sym, "behavior")
-    return {
+    payload = {
         "kind": "behavior",
         "id": sym.id,
         "title": b.get("title"),
@@ -66,6 +66,12 @@ def _behavior_payload(proj: Project, sym: Symbol) -> dict:
             "observables": _observable_deps(observables, refs),
         },
     }
+    # actor scopes who the requirement is about (normative); include it only when
+    # present so behaviors authored before actor existed keep their original hash.
+    actor = b.get("actor")
+    if actor:
+        payload["actor"] = actor
+    return payload
 
 
 def _invariant_payload(proj: Project, sym: Symbol) -> dict:

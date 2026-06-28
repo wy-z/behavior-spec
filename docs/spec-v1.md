@@ -61,7 +61,7 @@ One module per `*.bspec.json` file.
 ```json
 {
   "$schema": "https://wy-z.github.io/behavior-spec/v1/schema.json",
-  "bspecVersion": "0.1.0",
+  "bspecVersion": "v1",
   "module":      { },
   "glossary":    { },
   "interfaces":  [],
@@ -136,9 +136,9 @@ A `{ term: plain-language definition }` map shared by the file's units. Surfaced
 
 ### interface
 ```json
-{ "id": "trading.market-bars", "name": "…", "description": "…", "direction": "input", "protocol": "market-bar-stream" }
+{ "id": "trading.market-bars", "name": "…", "description": "…", "direction": "input" }
 ```
-`id` + `name` + `direction` required. `direction` ∈ `input | output | bidirectional`. `description` optional (hashed when referenced). `protocol` is an **open string** (not an enum): `ui|http|websocket|message-topic|market-bar-stream|broker-api|file|cli|schedule|…`.
+`id` + `name` + `direction` required. `direction` ∈ `input | output | bidirectional`. `description` optional (hashed when referenced).
 
 ### observable
 ```json
@@ -158,12 +158,14 @@ A `{ term: plain-language definition }` map shared by the file's units. Surfaced
 ### behavior
 ```json
 { "id": "trading.ma-cross.open-long", "name": "…", "title": "…", "rationale": "…",
+  "actor": "…",
   "given": { "cel": "…" },
   "when":  { "event": "market.bar.closed", "where": { "cel": "…" } },
   "then":  [ { "assert": { "cel": "…" } }, { "emit": { "event": "…", "where": { "cel": "…" } } }, { "forbid": { "event": "…" } } ],
   "origin": [ { "kind": "code", "uri": "…" } ] }
 ```
 - `name` required (short label). `title` required (EARS requirement; **normative**). `rationale` required (non-empty why; **normative** — §13).
+- `actor` optional: who initiates the rule (a human role, external system, or scheduler). Define the term in `glossary`. **Normative when present** (hashed) — it scopes who the requirement is about; omit for actorless rules.
 - `given` optional (no precondition ⇒ omit).
 - `when` required: exactly **one** trigger `event` (must be an **input** event); `where` optional.
 - `then` required, **≥1 entry**; each entry is exactly one of `assert | emit | forbid`.
@@ -324,6 +326,7 @@ v0.1 performs **no automated conflict detection** between CEL-predicated behavio
 
 ### Warnings
 - Declared but never referenced: observable / event / interface.
+- A referenced observable / event with no `description` (its meaning is hashed when referenced, §13.2).
 - `origin.uri` path not found on disk (origin is non-normative).
 - Flow with `< 2` steps; module with no members.
 

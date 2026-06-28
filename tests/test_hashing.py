@@ -93,3 +93,21 @@ def test_module_hash_is_membership_only():
     # adding a member DOES change the module hash (scope change)
     proj.membership[("behavior", "trading.ma-cross.new")] = "trading.ma-cross"
     assert hashing.unit_hash(proj, "module", "trading.ma-cross") != before
+
+
+def test_actor_absent_not_in_payload():
+    # actor was added after these behaviors were authored; an absent actor must NOT
+    # enter the hash payload, so existing approvals stay valid (no mass re-review)
+    proj = _proj()
+    sym = proj.get("behavior", "trading.ma-cross.open-long")
+    assert "actor" not in sym.obj
+    assert "actor" not in hashing.unit_payload(proj, "behavior", sym.id)
+
+
+def test_actor_added_changes_hash():
+    # actor scopes who the requirement is about → normative when present
+    proj = _proj()
+    sym = proj.get("behavior", "trading.ma-cross.open-long")
+    before = hashing.unit_hash(proj, "behavior", sym.id)
+    sym.obj["actor"] = "strategy-scheduler"
+    assert hashing.unit_hash(proj, "behavior", sym.id) != before
