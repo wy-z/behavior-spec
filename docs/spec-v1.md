@@ -375,7 +375,7 @@ Cross-file references are permitted in v0.1 (global namespace).
 ```
 
 - Review record key: `"<kind>:<id>"` where kind ∈ `module | behavior | invariant | flow`.
-- `decision` ∈ `approved | changes_requested | rejected | deferred`. **No `pending`/`stale` stored** — both are computed (§14).
+- `decision` ∈ `approved | changes_requested | rejected`. **No `pending`/`stale` stored** — both are computed (§14).
 - `reviewedAt` = RFC 3339.
 - `comment` optional.
 - `lang` = language of all human-readable text (`name`/`title`/`rationale`/`description`/`comment`) across the project's `*.bspec.json`; default `en`. Stored **only here**. Advisory metadata; not machine-enforced. Authors write that text in this language.
@@ -462,8 +462,11 @@ Scaffold in `path` (default cwd): `bspec.json` (`lang` = `--lang`, default `en`;
 0 errors, 3 warnings
 ```
 
-### `bspec review [--module <id>] [--kind behavior|invariant|flow|module] [--status pending|stale|approved|changes_requested|rejected|deferred]`
-Interactive `rich` prompt. The review card shows the `[kind][direction]` typed `name`, the EARS `title`, the `rationale`, the rule (GIVEN / WHEN / MUST), referenced terms, glossary, and — for flow/module — a derived diagram (flow pipeline / module I/O), all in human-readable form. Keys: `[a]` approve, `[c]` request changes (collects a comment), `[r]` reject, `[d]` defer, `[o]` open origin, `[q]` quit. Writes decisions (with current `semanticHash`, `reviewedAt`, optional `comment`) to `bspec.json`. **This is the only command that writes `bspec.json`.**
+### `bspec review [--module <id>] [--kind behavior|invariant|flow|module] [--status pending|stale|approved|changes_requested|rejected]`
+Interactive fullscreen review, one card at a time. The review card shows the `[kind][direction]` typed `name`, the EARS `title`, the `rationale`, the rule (GIVEN / WHEN / MUST), referenced terms, glossary, and — for flow/module — a derived diagram (flow pipeline / module I/O), all in human-readable form. Keys: `←`/`→` page between units, `↑`/`↓` (and the mouse wheel) scroll a card taller than the screen, `[a]` approve, `[r]` reject, `[c]` request changes (collects a comment), `[q]` or `Esc` quit; the same letter keys drive the non-interactive line-based fallback. Decisions are letters, never arrows — on the fullscreen alt-screen the mouse wheel is delivered as `↑`/`↓` (which scroll), so it can never fire a decision. Writes decisions (with current `semanticHash`, `reviewedAt`, optional `comment`) to `bspec.json`. **This is the only command that writes `bspec.json`.**
+
+### `bspec view [--module <id>] [--kind behavior|invariant|flow|module] [--status <status>]`
+Read-only browse of the same cards — every unit by default, regardless of status, so approved work stays viewable. Same navigation/scroll keys as `review` minus the decision keys (`←`/`→` page, `↑`/`↓` scroll, `[q]`/`Esc` quit). Writes nothing; non-interactive stdin prints the cards in sequence.
 
 ### `bspec doc [--module <id>]`
 Markdown + `mermaid` export (read-only) for sharing / GitHub: per module a context graph, each flow as a pipeline, and behaviors/invariants as rule text. Diagrams are **derived** from structure (`steps`, `interface`/`direction`); there is no diagram field to author.

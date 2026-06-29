@@ -10,18 +10,20 @@ from __future__ import annotations
 import datetime as _dt
 import json
 import os
+import sys
 
 import termaid
 from rich import box
 from rich.console import Console, Group
 from rich.panel import Panel
+from rich.segment import Segment
 from rich.table import Table
 from rich.text import Text
 
 from . import diagram, expression, status
 from .model import REVIEW_STATE_FILENAME, Project
 
-_DECISIONS = {"a": "approved", "c": "changes_requested", "r": "rejected", "d": "deferred"}
+_DECISIONS = {"a": "approved", "c": "changes_requested", "r": "rejected"}
 
 
 def _now() -> str:
@@ -54,7 +56,7 @@ def record_decision(root: str, key: str, decision: str, sem_hash: str,
 # --------------------------------------------------------------------------- #
 _STATUS_STYLE = {
     "pending": "yellow", "approved": "green", "changes_requested": "magenta",
-    "rejected": "red", "deferred": "blue", "stale": "red",
+    "rejected": "red", "stale": "red",
 }
 
 
@@ -289,22 +291,62 @@ def _card(proj: Project, kind: str, oid: str, info: dict, units: dict | None = N
 # --------------------------------------------------------------------------- #
 # interactive loop
 # --------------------------------------------------------------------------- #
-_ACTIONS = [
-    ("a", "approve", "green"), ("c", "changes", "magenta"), ("r", "reject", "red"),
-    ("d", "defer", "blue"), ("o", "origin", "cyan"), ("s", "skip", "white"),
-    ("q", "quit", "white"),
+# Decisions are letters, never arrows: on the alt-screen the mouse wheel is delivered
+# AS ↑/↓ (xterm "alternate scroll"). Binding ↑/↓ to scrolling the card means the wheel
+# scrolls (as users expect) and can never reach a decision.
+_KEYCAPS = [
+    ("← →", "unit", "cyan"), ("↑ ↓", "scroll", "cyan"), ("a", "approve", "green"),
+    ("r", "reject", "red"), ("c", "changes", "magenta"), ("q", "quit", "white"),
+]
+# `view` is the same carousel, read-only — navigation/scroll only, no decision keys.
+_VIEW_KEYCAPS = [
+    ("← →", "unit", "cyan"), ("↑ ↓", "scroll", "cyan"), ("q", "quit", "white"),
 ]
 
 
-def _action_bar() -> Panel:
-    """Toolbar of keycap badges so the keystroke for each action is unmistakable."""
-    t = Text()
-    for i, (key, label, color) in enumerate(_ACTIONS):
-        if i:
-            t.append("  ")
-        t.append(f" {key} ", style=f"reverse {color}")
-        t.append(f" {label}", style=color)
-    return Panel(t, box=box.ROUNDED, border_style="dim", padding=(0, 1))
+def _footer(idx: int, total: int, keycaps: list) -> Panel:
+    """Keycap toolbar + position."""
+    bar = Text()
+    bar.append(f" {idx + 1}/{total} ", style="reverse")
+    for cap, label, color in keycaps:
+        bar.append("   ")
+        bar.append(f" {cap} ", style=f"reverse {color}")
+        bar.append(f" {label}", style=color)
+    return Panel(bar, box=box.ROUNDED, border_style="dim", padding=(0, 1))
+
+
+def _read_key(fd: int) -> str:
+    """One logical keypress from a cbreak terminal: 'up'/'down'/'left'/'right', 'enter',
+    'eof', 'esc' (a lone Escape), or a lowercased character ('' for anything to ignore).
+    A lone Esc is told apart from an escape *sequence* by whether bytes follow within a
+    short deadline; a CSI/SS3 sequence is consumed through its final byte so leftover bytes
+    can never read back as a keystroke (only the four arrows map; everything else ignored)."""
+    import select
+
+    b = os.read(fd, 1)
+    if not b:
+        return "eof"
+    if b == b"\x03":
+        raise KeyboardInterrupt
+    if b in (b"\r", b"\n"):
+        return "enter"
+    if b == b"\x1b":
+        if not select.select([fd], [], [], 0.05)[0]:
+            return "esc"  # nothing follows → a real, lone Escape
+        intro = os.read(fd, 1)
+        if intro not in (b"[", b"O"):
+            return ""  # ESC + non-CSI (e.g. an Alt-combo) — ignore, never quit
+        seq = intro
+        while select.select([fd], [], [], 0.05)[0]:
+            c = os.read(fd, 1)
+            if not c:
+                break
+            seq += c
+            if 0x40 <= c[0] <= 0x7E:  # a CSI/SS3 final byte ends the sequence
+                break
+        return {b"[A": "up", b"[B": "down", b"[C": "right", b"[D": "left",
+                b"OA": "up", b"OB": "down", b"OC": "right", b"OD": "left"}.get(seq, "")
+    return b.decode("utf-8", "ignore").lower()
 
 
 def _select(proj: Project, units: dict, kinds, module, status_filter):
@@ -323,38 +365,155 @@ def _select(proj: Project, units: dict, kinds, module, status_filter):
     return items
 
 
-def run_review(proj: Project, kinds=None, module=None, status_filter=None) -> int:
-    units = status.compute(proj)
-    if status_filter is None:
-        status_filter = {"pending", "stale"}
-    items = _select(proj, units, kinds, module, status_filter)
-    # Cap at a readable column: a review card reads like prose, and on a very wide
-    # terminal an unbounded card sprawls (columns spread, diagrams float in space).
-    console = Console()
-    if console.size.width > 100:
-        console = Console(width=100)
-    if not items:
-        console.print("[dim]Nothing to review for that filter.[/]")
-        return 0
+def _tty_ok() -> bool:
+    """The fullscreen carousel needs a real terminal it can switch to raw input.
+    Piped/redirected stdin (CI, `echo … | bspec review`) or a platform without
+    `termios` (Windows) drops to the line-based reader instead."""
+    import importlib.util
 
+    if importlib.util.find_spec("termios") is None:
+        return False
+    return sys.stdin.isatty() and sys.stdout.isatty()
+
+
+def _ask_comment(live, console: Console, fd: int, saved) -> str | None:
+    """Leave the alt-screen and read a changes-comment in cooked mode, so native
+    line editing and multibyte (e.g. Chinese) input work; then re-enter raw mode and
+    the alt-screen. Empty input cancels. `live` is reused, so reset the overflow that
+    `Live.stop()` flips to 'visible' before resuming."""
+    import termios
+    import tty
+
+    live.stop()
+    termios.tcsetattr(fd, termios.TCSADRAIN, saved)
+    try:
+        comment = console.input("[magenta]comment (empty to cancel):[/] ").strip() or None
+    except (EOFError, KeyboardInterrupt):
+        comment = None
+    tty.setcbreak(fd)
+    live.vertical_overflow = "crop"
+    live.start(refresh=True)
+    return comment
+
+
+class _SegLines:
+    """Wrap already-rendered segment lines as a renderable, so the carousel can paint a
+    scrolled window of a card that is taller than the screen."""
+
+    def __init__(self, lines: list):
+        self._lines = lines
+
+    def __rich_console__(self, console: Console, options):
+        for line in self._lines:
+            yield from line
+            yield Segment.line()
+
+
+def _frame(console: Console, card, foot, scroll: int):
+    """One scrolled frame: render `card` to full-width lines (pad=True → a scroll repaint
+    leaves no stale cells) and window it to top offset `scroll` (clamped to the card
+    height), with `foot` pinned below a scroll indicator. Returns the renderable and the
+    maximum scroll offset, so the caller can clamp its own state to match."""
+    full = console.options.update(height=None)
+    lines = console.render_lines(card, full)
+    view_h = max(1, console.size.height - len(console.render_lines(foot, full)) - 1)
+    max_scroll = max(0, len(lines) - view_h)
+    scroll = min(scroll, max_scroll)
+    bar = (f"  ↕ {scroll + 1}–{min(scroll + view_h, len(lines))}/{len(lines)}   ↑/↓ scroll"
+           if max_scroll else "")
+    window = Group(_SegLines(lines[scroll:scroll + view_h]), Text(bar, style="dim"), foot)
+    return window, max_scroll
+
+
+def _run_carousel(proj: Project, console: Console, items: list, units: dict,
+                  read_only: bool = False) -> int:
+    """Fullscreen one-card-at-a-time browser: ←/→ page between units; ↑/↓ (and the mouse
+    wheel) scroll a card taller than the screen; `q` quit. Unless `read_only`, it also
+    reviews — `a` approve, `r` reject, `c` request changes — recording each decision and
+    advancing. Decisions are letter keys, never arrows (see _KEYCAPS); a decision repaints
+    the card in place (its status is the same dict `units` holds). Past the last card ends."""
+    import termios
+    import tty
+    from rich.live import Live
+
+    keycaps = _VIEW_KEYCAPS if read_only else _KEYCAPS
+    fd = sys.stdin.fileno()
+    saved = termios.tcgetattr(fd)
+    recorded = 0
+    idx = 0
+    scroll = 0
+
+    def decide(decision: str, comment: str | None = None) -> None:
+        nonlocal recorded, idx
+        kind, oid, info = items[idx]
+        record_decision(proj.root, f"{kind}:{oid}", decision, info["hash"], comment)
+        info["status"] = decision
+        info.pop("prior", None)
+        recorded += 1
+        idx += 1  # advance; loop exits when this passes the last card
+
+    try:
+        tty.setcbreak(fd)
+        with Live(console=console, screen=True, auto_refresh=False,
+                  vertical_overflow="crop") as live:
+            while idx < len(items):
+                kind, oid, info = items[idx]
+                card = _card(proj, kind, oid, info, units)
+                window, max_scroll = _frame(
+                    console, card, _footer(idx, len(items), keycaps), scroll)
+                scroll = min(scroll, max_scroll)
+                live.update(window)
+                live.refresh()
+                key = _read_key(fd)
+                if key in ("q", "esc", "eof"):
+                    break
+                if key == "up":
+                    scroll = max(0, scroll - 1)
+                elif key == "down":
+                    scroll = min(max_scroll, scroll + 1)
+                elif key == "left":
+                    idx, scroll = max(0, idx - 1), 0
+                elif key == "right":
+                    idx, scroll = min(len(items) - 1, idx + 1), 0
+                elif not read_only and key == "a":
+                    decide("approved")
+                    scroll = 0
+                elif not read_only and key == "r":
+                    decide("rejected")
+                    scroll = 0
+                elif not read_only and key == "c":
+                    comment = _ask_comment(live, console, fd, saved)
+                    if comment:
+                        decide("changes_requested", comment)
+                    scroll = 0
+    except KeyboardInterrupt:
+        pass
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, saved)
+
+    if not read_only:
+        msg = (f"{recorded} decision(s) written to {REVIEW_STATE_FILENAME}."
+               if recorded else "No decisions recorded.")
+        console.print(f"\n[dim]{msg}[/]")
+    return 0
+
+
+def _run_linear(proj: Project, console: Console, items: list, units: dict) -> int:
+    """Line-based fallback for non-terminal stdin (pipes/CI): print each card and read
+    a single letter — a approve, r reject, c changes, s/⏎ skip, q quit."""
     recorded = 0
     for n, (kind, oid, info) in enumerate(items, 1):
         console.print()
         console.rule(f"[dim]{n}/{len(items)}[/]", align="left")
         console.print(_card(proj, kind, oid, info, units))
-        console.print(_action_bar())
+        console.print("[dim]a approve  r reject  c changes  s skip  q quit[/]")
         try:
             choice = console.input("[bold green]❯[/] ").strip().lower()
         except EOFError:
-            console.print("\n[dim](no input; stopping)[/]")
             break
         if choice == "q":
             break
         if choice in ("", "s"):
-            continue
-        if choice == "o":
-            for org in proj.get(kind, oid).obj.get("origin", []):
-                console.print(f"  [cyan]{org.get('uri')}[/]")
             continue
         decision = _DECISIONS.get(choice)
         if decision is None:
@@ -366,10 +525,51 @@ def run_review(proj: Project, kinds=None, module=None, status_filter=None) -> in
                 comment = console.input("  [magenta]comment:[/] ").strip() or None
             except EOFError:
                 comment = None
+            if comment is None:
+                console.print("  [dim]changes need a comment; skipped[/]")
+                continue
         record_decision(proj.root, f"{kind}:{oid}", decision, info["hash"], comment)
         recorded += 1
         console.print(f"  [{_STATUS_STYLE.get(decision, 'white')}]recorded: {decision}[/]")
 
     if recorded:
-        console.print(f"\n[dim]{recorded} decision(s) written to bspec.json.[/]")
+        console.print(f"\n[dim]{recorded} decision(s) written to {REVIEW_STATE_FILENAME}.[/]")
+    return 0
+
+
+def _make_console() -> Console:
+    # Cap at a readable column: a review card reads like prose, and on a very wide
+    # terminal an unbounded card sprawls (columns spread, diagrams float in space).
+    console = Console()
+    return Console(width=100) if console.size.width > 100 else console
+
+
+def run_review(proj: Project, kinds=None, module=None, status_filter=None) -> int:
+    units = status.compute(proj)
+    if status_filter is None:
+        status_filter = {"pending", "stale"}
+    items = _select(proj, units, kinds, module, status_filter)
+    console = _make_console()
+    if not items:
+        console.print("[dim]Nothing to review for that filter.[/]")
+        return 0
+    if _tty_ok():
+        return _run_carousel(proj, console, items, units)
+    return _run_linear(proj, console, items, units)
+
+
+def run_view(proj: Project, kinds=None, module=None, status_filter=None) -> int:
+    """Read-only browse of the same cards — every unit by default, regardless of status,
+    so approved work stays viewable. Writes nothing. Non-terminal stdin prints the cards."""
+    units = status.compute(proj)
+    items = _select(proj, units, kinds, module, status_filter)
+    console = _make_console()
+    if not items:
+        console.print("[dim]No units to view.[/]")
+        return 0
+    if _tty_ok():
+        return _run_carousel(proj, console, items, units, read_only=True)
+    for n, (kind, oid, info) in enumerate(items, 1):
+        console.rule(f"[dim]{n}/{len(items)}[/]", align="left")
+        console.print(_card(proj, kind, oid, info, units))
     return 0

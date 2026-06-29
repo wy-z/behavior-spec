@@ -137,6 +137,17 @@ def cmd_review(args: argparse.Namespace) -> int:
     return review.run_review(proj, kinds=kinds, module=args.module, status_filter=status_filter)
 
 
+def cmd_view(args: argparse.Namespace) -> int:
+    root = loader.find_root(os.getcwd())
+    proj, diags = _collect_diagnostics(root)
+    if any(d.severity == "error" for d in diags):
+        print("Validation errors present; run `bspec validate` first.", file=sys.stderr)
+        return 1
+    kinds = {args.kind} if args.kind else None
+    status_filter = {args.status} if args.status else None
+    return review.run_view(proj, kinds=kinds, module=args.module, status_filter=status_filter)
+
+
 # --------------------------------------------------------------------------- #
 # arg parsing
 # --------------------------------------------------------------------------- #
@@ -172,6 +183,12 @@ def build_parser() -> argparse.ArgumentParser:
     pr.add_argument("--kind", choices=("module", "behavior", "invariant", "flow"))
     pr.add_argument("--status", help="restrict to one status (default: pending+stale)")
     pr.set_defaults(func=cmd_review)
+
+    pview = sub.add_parser("view", help="read-only browse of review cards (writes nothing)")
+    pview.add_argument("--module", help="restrict to one module")
+    pview.add_argument("--kind", choices=("module", "behavior", "invariant", "flow"))
+    pview.add_argument("--status", help="restrict to one status (default: all)")
+    pview.set_defaults(func=cmd_view)
 
     return p
 

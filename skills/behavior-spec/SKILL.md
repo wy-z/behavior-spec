@@ -176,7 +176,7 @@ matrix + schema subset: `references/cheatsheet.md`.
 ## Review (humans only)
 
 ```bash
-bspec review --module <module-id>      # interactive: [a]pprove [c]hanges [r]eject [d]efer
+bspec review --module <module-id>      # interactive: ←/→ unit, ↑/↓ scroll, [a]pprove [r]eject [c]hanges [q]uit
 ```
 
 The review cards and `bspec doc` show diagrams for flows (an ordered step
