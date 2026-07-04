@@ -61,7 +61,7 @@ One module per `*.bspec.json` file.
 ```json
 {
   "$schema": "https://wy-z.github.io/behavior-spec/v1/schema.json",
-  "bspecVersion": "0.1.0",
+  "bspecVersion": "v1",
   "module":      { },
   "glossary":    { },
   "interfaces":  [],
@@ -136,9 +136,9 @@ A `{ term: plain-language definition }` map shared by the file's units. Surfaced
 
 ### interface
 ```json
-{ "id": "trading.market-bars", "name": "…", "description": "…", "direction": "input", "protocol": "market-bar-stream" }
+{ "id": "trading.market-bars", "name": "…", "description": "…", "direction": "input" }
 ```
-`id` + `name` + `direction` required. `direction` ∈ `input | output | bidirectional`. `description` optional (hashed when referenced). `protocol` is an **open string** (not an enum): `ui|http|websocket|message-topic|market-bar-stream|broker-api|file|cli|schedule|…`.
+`id` + `name` + `direction` required. `direction` ∈ `input | output | bidirectional`. `description` optional (hashed when referenced).
 
 ### observable
 ```json
@@ -158,12 +158,14 @@ A `{ term: plain-language definition }` map shared by the file's units. Surfaced
 ### behavior
 ```json
 { "id": "trading.ma-cross.open-long", "name": "…", "title": "…", "rationale": "…",
+  "actor": "…",
   "given": { "cel": "…" },
   "when":  { "event": "market.bar.closed", "where": { "cel": "…" } },
   "then":  [ { "assert": { "cel": "…" } }, { "emit": { "event": "…", "where": { "cel": "…" } } }, { "forbid": { "event": "…" } } ],
   "origin": [ { "kind": "code", "uri": "…" } ] }
 ```
 - `name` required (short label). `title` required (EARS requirement; **normative**). `rationale` required (non-empty why; **normative** — §13).
+- `actor` optional: who initiates the rule (a human role, external system, or scheduler). Define the term in `glossary`. **Normative when present** (hashed) — it scopes who the requirement is about; omit for actorless rules.
 - `given` optional (no precondition ⇒ omit).
 - `when` required: exactly **one** trigger `event` (must be an **input** event); `where` optional.
 - `then` required, **≥1 entry**; each entry is exactly one of `assert | emit | forbid`.
@@ -324,6 +326,7 @@ v0.1 performs **no automated conflict detection** between CEL-predicated behavio
 
 ### Warnings
 - Declared but never referenced: observable / event / interface.
+- A referenced observable / event with no `description` (its meaning is hashed when referenced, §13.2).
 - `origin.uri` path not found on disk (origin is non-normative).
 - Flow with `< 2` steps; module with no members.
 
@@ -372,7 +375,7 @@ Cross-file references are permitted in v0.1 (global namespace).
 ```
 
 - Review record key: `"<kind>:<id>"` where kind ∈ `module | behavior | invariant | flow`.
-- `decision` ∈ `approved | changes_requested | rejected | deferred`. **No `pending`/`stale` stored** — both are computed (§14).
+- `decision` ∈ `approved | changes_requested | rejected`. **No `pending`/`stale` stored** — both are computed (§14).
 - `reviewedAt` = RFC 3339.
 - `comment` optional.
 - `lang` = language of all human-readable text (`name`/`title`/`rationale`/`description`/`comment`) across the project's `*.bspec.json`; default `en`. Stored **only here**. Advisory metadata; not machine-enforced. Authors write that text in this language.
@@ -459,8 +462,11 @@ Scaffold in `path` (default cwd): `bspec.json` (`lang` = `--lang`, default `en`;
 0 errors, 3 warnings
 ```
 
-### `bspec review [--module <id>] [--kind behavior|invariant|flow|module] [--status pending|stale|approved|changes_requested|rejected|deferred]`
-Interactive `rich` prompt. The review card shows the `[kind][direction]` typed `name`, the EARS `title`, the `rationale`, the rule (GIVEN / WHEN / MUST), referenced terms, glossary, and — for flow/module — a derived diagram (flow pipeline / module I/O), all in human-readable form. Keys: `[a]` approve, `[c]` request changes (collects a comment), `[r]` reject, `[d]` defer, `[o]` open origin, `[q]` quit. Writes decisions (with current `semanticHash`, `reviewedAt`, optional `comment`) to `bspec.json`. **This is the only command that writes `bspec.json`.**
+### `bspec review [--module <id>] [--kind behavior|invariant|flow|module] [--status pending|stale|approved|changes_requested|rejected]`
+Interactive fullscreen review, one card at a time. The review card shows the `[kind][direction]` typed `name`, the EARS `title`, the `rationale`, the rule (GIVEN / WHEN / MUST), referenced terms, glossary, and — for flow/module — a derived diagram (flow pipeline / module I/O), all in human-readable form. Keys: `←`/`→` page between units, `↑`/`↓` (and the mouse wheel) scroll a card taller than the screen, `[a]` approve, `[r]` reject, `[c]` request changes (collects a comment), `[q]` or `Esc` quit; the same letter keys drive the non-interactive line-based fallback. Decisions are letters, never arrows — on the fullscreen alt-screen the mouse wheel is delivered as `↑`/`↓` (which scroll), so it can never fire a decision. Writes decisions (with current `semanticHash`, `reviewedAt`, optional `comment`) to `bspec.json`. **This is the only command that writes `bspec.json`.**
+
+### `bspec view [--module <id>] [--kind behavior|invariant|flow|module] [--status <status>]`
+Read-only browse of the same cards — every unit by default, regardless of status, so approved work stays viewable. Same navigation/scroll keys as `review` minus the decision keys (`←`/`→` page, `↑`/`↓` scroll, `[q]`/`Esc` quit). Writes nothing; non-interactive stdin prints the cards in sequence.
 
 ### `bspec doc [--module <id>]`
 Markdown + `mermaid` export (read-only) for sharing / GitHub: per module a context graph, each flow as a pipeline, and behaviors/invariants as rule text. Diagrams are **derived** from structure (`steps`, `interface`/`direction`); there is no diagram field to author.

@@ -83,14 +83,23 @@ For each behavior:
 5. Put every required result in `then` — each entry is exactly one of
    `assert` / `emit` / `forbid`; all entries are mandatory (AND).
 6. Reference only declared observables, parameters, events, interfaces.
-7. Record one or more `origin` entries (where you derived it).
+7. Optionally record `origin` entries (non-normative provenance — where you derived it).
 8. Keep the machine-checkable constraint in CEL/schema — `title`/`rationale` state
    the rule for humans (both hashed), but must never be the *only* place a
    constraint lives.
 9. If the code is ambiguous, do **not** invent intent — leave the behavior out
    or describe the ambiguity in an `origin.note`, and tell the user.
 
-After writing files: `bspec validate --json`, and fix **every** error before review.
+Optionally set `actor` — who initiates the rule (a human role, external system, or
+scheduler) — and define that term in the file `glossary`. It scopes *who* the
+requirement is about for review; omit it for actorless rules. It is hashed when
+present, so editing it re-opens review.
+
+After writing files, two gates are mandatory before you ask for human review — skip
+neither:
+1. `bspec validate --json` — fix **every** error (schema, references, CEL types).
+2. **Spec self-review** (see below) — the semantic checks the validator cannot make;
+   resolve every finding.
 
 ## Writing name / title / rationale (every card stands alone)
 
@@ -168,10 +177,35 @@ none may prefix another; every other id uses hyphens, never underscores; payload
 property names are CEL identifiers (`exit_code`).** Full rules + CEL namespace
 matrix + schema subset: `references/cheatsheet.md`.
 
-## Review (humans only)
+## Spec self-review (mandatory gate — before human review)
+
+This is **gate 2** from *Behavior generation*: run it on every new/changed unit before
+asking for review — not optional, and not a command the human runs. `bspec validate`
+checks schema, references, and CEL types — never *meaning*; this gate is the semantic
+layer the tool cannot see. It is expression-quality only; it is **not** you approving
+anything (see *Prohibited actions*). Check each unit against the card the human will see:
+
+- **prose↔CEL fidelity** — does `title`/`rationale` describe exactly what the CEL and
+  schema enforce? Flag any drift (`title` says "at most" but the CEL asserts `<`; the CEL
+  adds a condition the prose omits).
+- **EARS pattern** — `title` matches the pattern for its kind (table above).
+- **singularity** — one thought per unit; if "and/or" joins two results, split it.
+- **ambiguity** — every load-bearing term is pinned in `glossary` or the CEL, not left to
+  interpretation ("fast", "valid").
+- **standalone** — a cold reviewer can decide agree/reject from this one card.
+- **cross-unit conflict** — no two units have overlapping `given`/`when` with
+  contradictory `then`, and no duplicate intent.
+
+Resolve each finding: on a `pending`, `changes_requested`, or `stale` unit, fix the
+`*.bspec.json` and re-validate. On an `approved` or `rejected` unit, do **not** silently
+edit it (editing an approved unit re-opens its review; a rejected one is replaced only
+when the reviewer asks) — surface it. Any judgment call (is this really a conflict? is
+this ambiguity acceptable?) — surface it with your recommendation; the human decides.
+
+## Review (the human owns every decision)
 
 ```bash
-bspec review --module <module-id>      # interactive: [a]pprove [c]hanges [r]eject [d]efer
+bspec review --module <module-id>      # interactive: ←/→ unit, ↑/↓ scroll, [a]pprove [r]eject [c]hanges [q]uit
 ```
 
 The review cards and `bspec doc` show diagrams for flows (an ordered step
@@ -184,7 +218,8 @@ module as rendered diagrams (GitHub / VS Code render the mermaid):
 bspec doc --module <module-id>         # markdown + mermaid to stdout
 ```
 
-The human owns all approval decisions. After review:
+The human owns every approval decision — made here by keypress, or delegated to the agent
+for a scoped batch (*Assisting a large review*). After review:
 
 ```bash
 bspec status --json
@@ -197,6 +232,55 @@ reviewer explicitly asks for a different behavior.
 
 A spec becomes `stale` automatically when its normative content — or the schema
 of an observable/event it references — changes. Stale items need re-review.
+
+## Assisting a large review (only when the human asks)
+
+When the human **explicitly asks** you to help clear a batch, you act as their delegate:
+record approvals for the units you can confidently clear, and leave the rest. Only on
+request — never on your own initiative, and never during authoring (that is the self-review
+gate above, which approves nothing). Three hard limits gate every approval:
+
+- **Work only from a list the human has seen.** They name the scope — a module, a kind, or
+  an id list; a bare "help me review" or "all pending" names none. Unless they handed you
+  the exact ids, enumerate the units you would approve (after the two limits below), show
+  that list, and get their go-ahead before you write anything. Never sweep any scope unseen.
+- **Only `pending` units.** Approve a unit only if `bspec status --json` reports it
+  `pending` (never reviewed). Never touch one that already carries a decision — `approved`,
+  `changes_requested`, `rejected`, or `stale`: that is a human's call (or its history), and
+  overturning it is the human's job, not yours.
+- **Only expression-clear + low-stakes units.** The self-review checks above must all pass
+  **and** the requirement must be mechanical and self-evidently right. Clarity ≠ correctness:
+  a well-worded rule can still be wrong to ship, so **never** agent-approve a unit whose
+  behavior touches deletion or data loss, money/billing, auth/permissions, security or
+  privacy, legal/compliance, external side effects, or anything irreversible or
+  policy-laden — those go to the human even when perfectly worded. When in doubt, leave it.
+
+There is no non-interactive approve command — you edit the review-state file yourself:
+
+1. `bspec status --json` — for each `pending` unit in scope read `units["kind:id"].hash`.
+2. Add its entry to the `reviews` map of `bspec.json` (if the file is absent, scaffold it
+   with `bspec init` first). Touch **only** the entries you are approving —
+   never edit or drop another unit's record:
+
+   ```json
+   "behavior:<id>": {
+     "semanticHash": "<the live units[key].hash from status --json, copied verbatim>",
+     "decision": "approved",
+     "reviewedAt": "<current local time, ISO-8601, e.g. 2026-07-04T10:30:00+08:00>",
+     "comment": "agent-approved: <what you checked; why it is clearly correct and low-stakes>"
+   }
+   ```
+
+   - Copy the **live** hash verbatim; never invent one. A wrong hash makes the record
+     `stale` (the same guard as any drifted review), so an approval can never outlive the
+     spec it approved.
+   - `comment` **must** begin with the literal `agent-approved:`. The record has no reviewer
+     field, so that fixed prefix is the audit marker that lets anyone (or a later tool) tell
+     your approvals from a human's; after it, say why the unit is clearly correct.
+3. `bspec status --json` again — confirm each unit you touched now reads `approved` (not
+   `stale`, which means a wrong hash; a crash means you malformed the JSON — fix it), and
+   that no other unit's status changed.
+4. Report which units you approved (with the reasons) and which you left for the human.
 
 ## Implementing code from specs
 
@@ -211,8 +295,15 @@ new requirement in code without writing it into the spec.
 ## Prohibited actions
 
 Never:
-- write or modify `bspec.json` / any review record;
-- mark a behavior approved, or fabricate a decision or semantic hash;
+- write `bspec.json` **except** when the human explicitly asked you to help review, and then
+  only to approve `pending` units from a list they saw (or gave), as in
+  *Assisting a large review* — otherwise only `bspec review` (a human keypress) writes it;
+- overwrite or drop any existing review record — you approve only never-reviewed (`pending`)
+  units, never overturn a human's `approved`/`changes_requested`/`rejected`/`stale` decision;
+- agent-approve a unit that turns on business judgment, or touches deletion, money, auth,
+  security/privacy, legal, external side effects, or anything irreversible — those stay the
+  human's even when clearly worded;
+- fabricate a semantic hash — always copy the live `units[key].hash` from `bspec status --json`;
 - hide validation errors;
 - silently replace an approved behavior;
 - encode an implementation choice as observable product behavior;

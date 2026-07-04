@@ -33,6 +33,7 @@ def run(proj: Project) -> list[Diagnostic]:
     _check_references(proj, diags)
     _check_prose(proj, diags)
     _check_unused(proj, diags)
+    _check_undescribed_refs(proj, diags)
     _check_origin_paths(proj, diags)
     _check_flows_and_modules(proj, diags)
     _check_cel(proj, diags)
@@ -204,15 +205,23 @@ def _check_prose(proj: Project, diags: list[Diagnostic]) -> None:
 # --------------------------------------------------------------------------- #
 # warnings
 # --------------------------------------------------------------------------- #
-def _check_unused(proj: Project, diags: list[Diagnostic]) -> None:
-    used_events: set[str] = set()
+def _referenced_events(proj: Project) -> set[str]:
+    """Event ids named by any behavior's trigger or emit/forbid clauses."""
+    out: set[str] = set()
     for sym in proj.kind("behavior").values():
         b = sym.obj
-        used_events.add(b.get("when", {}).get("event"))
+        trigger = b.get("when", {}).get("event")
+        if trigger:
+            out.add(trigger)
         for entry in b.get("then", []):
             for key in ("emit", "forbid"):
-                if key in entry:
-                    used_events.add(entry[key].get("event"))
+                if key in entry and entry[key].get("event"):
+                    out.add(entry[key]["event"])
+    return out
+
+
+def _check_unused(proj: Project, diags: list[Diagnostic]) -> None:
+    used_events = _referenced_events(proj)
     used_interfaces = {s.obj.get("interface") for s in proj.kind("event").values()}
 
     for sym in proj.kind("event").values():
@@ -225,6 +234,30 @@ def _check_unused(proj: Project, diags: list[Diagnostic]) -> None:
             diags.append(Diagnostic("warning", "unused",
                                     f"interface '{sym.id}' is never referenced",
                                     unit=f"interface:{sym.id}", file=sym.file))
+
+
+def _check_undescribed_refs(proj: Project, diags: list[Diagnostic]) -> None:
+    """An event/observable referenced by a rule carries meaning that shapes the
+    approval — its description is hashed when referenced (spec §13.2). Warn when a
+    directly referenced event/observable has none, so neither the reviewer nor the
+    implementing agent has to infer the contract.
+    """
+    from . import expression  # noqa: PLC0415
+
+    observables: set[str] = set()
+    for kind in ("behavior", "invariant"):
+        for sym in proj.kind(kind).values():
+            observables |= expression.referenced_observables(proj, sym, kind)
+
+    for kind, ids in (("event", _referenced_events(proj)), ("observable", observables)):
+        for oid in sorted(ids):
+            sym = proj.get(kind, oid)
+            if sym is not None and not (sym.obj.get("description") or "").strip():
+                diags.append(Diagnostic(
+                    "warning", "undescribed-ref",
+                    f"{kind} '{oid}' is referenced by a rule but has no description; "
+                    "a reviewer cannot judge the rule's meaning without it",
+                    unit=f"{kind}:{oid}", file=sym.file))
 
 
 def _check_origin_paths(proj: Project, diags: list[Diagnostic]) -> None:

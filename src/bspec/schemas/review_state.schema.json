@@ -24,7 +24,7 @@
         "semanticHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
         "decision": {
           "type": "string",
-          "enum": ["approved", "changes_requested", "rejected", "deferred"]
+          "enum": ["approved", "changes_requested", "rejected"]
         },
         "reviewedAt": { "type": "string" },
         "comment": { "type": "string" }

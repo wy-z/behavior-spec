@@ -17,7 +17,7 @@ def test_valid_file_passes():
 
 def test_unknown_field_rejected():
     raw = {
-        "bspecVersion": "0.1.0",
+        "bspecVersion": "v1",
         "module": {"id": "m"},
         "observables": [
             {"id": "x.y", "role": "state", "valueSchema": {"type": "number"}, "extra": True}
@@ -28,14 +28,14 @@ def test_unknown_field_rejected():
 
 
 def test_missing_required_module_rejected():
-    diags = _errors(schema.validate_file({"bspecVersion": "0.1.0"}, "f"))
+    diags = _errors(schema.validate_file({"bspecVersion": "v1"}, "f"))
     assert diags
 
 
 def test_general_id_allows_underscore():
     # event/module/behavior ids may use underscores (only observable ids forbid '-')
     raw = {
-        "bspecVersion": "0.1.0",
+        "bspecVersion": "v1",
         "module": {"id": "m", "name": "M", "rationale": "underscore id fixture"},
         "interfaces": [{"id": "io", "name": "IO", "direction": "input"}],
         "events": [
@@ -49,7 +49,7 @@ def test_general_id_allows_underscore():
 def test_observable_id_must_be_cel_identifier():
     # hyphen is allowed in general ids but NOT in CEL-addressable observable ids
     raw = {
-        "bspecVersion": "0.1.0",
+        "bspecVersion": "v1",
         "module": {"id": "m"},
         "observables": [
             {"id": "ma-cross.signal", "role": "state", "valueSchema": {"type": "number"}}
@@ -60,7 +60,7 @@ def test_observable_id_must_be_cel_identifier():
 
 def test_behavior_then_oneof_rejects_mixed_entry():
     raw = {
-        "bspecVersion": "0.1.0",
+        "bspecVersion": "v1",
         "module": {"id": "m"},
         "behaviors": [
             {

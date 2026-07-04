@@ -8,10 +8,10 @@ with the `bspec` CLI.
 | Object | Purpose |
 |---|---|
 | `module` | Human review boundary (NOT a code package). |
-| `interface` | Observable boundary; `direction` input/output/bidirectional; open-string `protocol`. |
+| `interface` | Observable boundary; `direction` input/output/bidirectional. |
 | `observable` | A reviewable value; `role` state/parameter; restricted `valueSchema`. |
 | `event` | Input or output at a point in time; `direction`; `interface` ref; `payloadSchema`. |
-| `behavior` | `given` + `when` → `then`. One trigger event, one business reaction. |
+| `behavior` | `given` + `when` → `then`; optional `actor` (who initiates). One trigger event, one business reaction. |
 | `invariant` | `while` → `assert`; must always hold. |
 | `flow` | Ordered behavior ids; navigation only, non-normative. |
 | `origin` | Why the agent derived a spec (file-level); review metadata, non-normative. |
@@ -78,7 +78,7 @@ object→typed object, array→list.
 
 - no review record → `pending`
 - record hash == current → the recorded decision (`approved` / `changes_requested`
-  / `rejected` / `deferred`)
+  / `rejected`)
 - record hash != current → `stale`
 
 The semantic hash covers the approved contract: CEL (canonicalized), the unit's
@@ -94,5 +94,6 @@ stale the module — `bspec status` shows a per-module rollup instead.
 bspec init [path]                           # scaffold bspec.json (review-state file)
 bspec validate [path] [--json] [--strict]   # schema + reference + CEL checks (exit 1 on error)
 bspec review [--module M] [--kind K] [--status S]   # interactive; only writer of bspec.json
+bspec view [--module M] [--kind K] [--status S]     # read-only browse of all cards (writes nothing)
 bspec status [path] [--json]                # per-kind + per-module status
 ```

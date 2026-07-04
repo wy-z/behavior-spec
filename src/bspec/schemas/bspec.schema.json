@@ -6,7 +6,7 @@
   "required": ["bspecVersion", "module"],
   "properties": {
     "$schema": { "type": "string" },
-    "bspecVersion": { "type": "string", "const": "0.1.0" },
+    "bspecVersion": { "type": "string", "const": "v1" },
     "module": { "$ref": "#/$defs/module" },
     "glossary": { "type": "object", "additionalProperties": { "type": "string", "minLength": 1 } },
     "interfaces": { "type": "array", "items": { "$ref": "#/$defs/interface" } },
@@ -49,8 +49,7 @@
         "id": { "$ref": "#/$defs/generalId" },
         "name": { "type": "string", "minLength": 1 },
         "description": { "type": "string" },
-        "direction": { "type": "string", "enum": ["input", "output", "bidirectional"] },
-        "protocol": { "type": "string" }
+        "direction": { "type": "string", "enum": ["input", "output", "bidirectional"] }
       },
       "unevaluatedProperties": false
     },
@@ -90,6 +89,7 @@
         "name": { "type": "string", "minLength": 1 },
         "title": { "type": "string", "minLength": 1 },
         "rationale": { "type": "string", "minLength": 1 },
+        "actor": { "type": "string", "minLength": 1 },
         "given": { "$ref": "#/$defs/cel" },
         "when": { "$ref": "#/$defs/when" },
         "then": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/thenEntry" } },

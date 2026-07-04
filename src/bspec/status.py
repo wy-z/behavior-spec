@@ -1,9 +1,10 @@
 """Review status: pending/stale derivation and per-module rollup.
 
 `pending`/`stale` are computed, never stored:
-  - no review record           -> pending
-  - record hash == current     -> the recorded decision (fresh)
-  - record hash != current     -> stale (prior decision retained for display)
+  - no review record -> pending
+  - record hash == current and its decision is still supported -> that decision (fresh)
+  - otherwise (hash drifted, or a decision no longer supported such as a legacy
+    `deferred`) -> stale (prior decision retained for display)
 """
 
 from __future__ import annotations
@@ -15,7 +16,8 @@ from . import hashing
 from .model import REVIEW_STATE_FILENAME, Project
 
 REVIEW_KINDS = ("module", "behavior", "invariant", "flow")
-STATUSES = ("approved", "changes_requested", "rejected", "deferred", "stale", "pending")
+STORED_DECISIONS = ("approved", "changes_requested", "rejected")
+STATUSES = STORED_DECISIONS + ("stale", "pending")
 
 
 def load_review_state(root: str) -> dict:
@@ -36,7 +38,7 @@ def compute(proj: Project) -> dict[str, dict]:
         rec = reviews.get(key)
         if rec is None:
             out[key] = {"hash": h, "status": "pending", "prior": None}
-        elif rec.get("semanticHash") == h:
+        elif rec.get("semanticHash") == h and rec.get("decision") in STORED_DECISIONS:
             out[key] = {"hash": h, "status": rec.get("decision"), "prior": None}
         else:
             out[key] = {"hash": h, "status": "stale", "prior": rec.get("decision")}
