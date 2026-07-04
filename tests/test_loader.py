@@ -86,3 +86,15 @@ def test_specglobs_escaping_root_is_ignored(tmp_path):
     proj, diags = loader.load_project(str(root))
     assert proj.get("module", "out") is None
     assert any(d.code == "spec-glob-escape" for d in diags)
+
+
+def test_corrupt_review_state_is_error_not_silent(tmp_path):
+    root = tmp_path / "p"
+    root.mkdir(parents=True)
+    (root / "bspec.json").write_text("{not json", encoding="utf-8")
+    _write(root / "m.bspec.json",
+           {"bspecVersion": "v1", "module": {"id": "m", "name": "M", "rationale": "corrupt-state fixture"}})
+    proj, diags = loader.load_project(str(root))
+    assert any(d.code == "review-state-read" for d in _errors(diags))
+    # loading still proceeds on the default globs so other errors stay visible
+    assert proj.get("module", "m") is not None

@@ -13,11 +13,6 @@ REVIEW_KINDS = ("module", "behavior", "invariant", "flow")
 DEFINITION_KINDS = ("interface", "observable", "event")
 ALL_KINDS = REVIEW_KINDS + DEFINITION_KINDS
 
-# Ids that are addressed inside CEL (so they must be dot-separated CEL identifiers).
-CEL_ADDRESSABLE_KINDS = ("observable",)  # parameters are observables with role=parameter
-
-GENERAL_ID = r"^[a-z][a-z0-9_]*(?:[.-][a-z0-9_]+)*$"
-CEL_ID = r"^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*$"
 CEL_SEGMENT = r"^[a-z][a-z0-9_]*$"  # event payload / object property names
 
 # Review-state container at the project root (visible file, not a dotfile).

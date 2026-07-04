@@ -260,7 +260,8 @@ class Checker:
             return DOUBLE if "double" in (lb, rb) else INT
         if op_node.data == "addition_add" and lb == "string" and rb == "string":
             return STRING
-        if op_node.data == "addition_add" and isinstance(left, ListT):
+        if (op_node.data == "addition_add" and isinstance(left, ListT)
+                and isinstance(right, ListT) and _same(left.elem, right.elem)):
             return left
         self.err(f"invalid operands for arithmetic: {_name(left)}, {_name(right)}")
         return DYN
@@ -328,6 +329,9 @@ class Checker:
         if name == "has":
             for a in args:
                 self.walk(a)
+            path = _path(args[0]) if len(args) == 1 else None
+            if path is None or len(path) < 2:
+                self.err("has() requires exactly one field-selection argument, e.g. has(trigger.note)")
             return BOOL
         if name in _WHITELIST_FUNCS:
             for a in args:
@@ -514,6 +518,8 @@ def _same(a, b) -> bool:
         return True
     if isinstance(a, Scalar) and isinstance(b, Scalar):
         return a.name == b.name
+    if isinstance(a, ListT) and isinstance(b, ListT):
+        return _same(a.elem, b.elem)
     return type(a) is type(b)
 
 
@@ -534,7 +540,7 @@ def _check_clause(text, namespaces, allowed, unit, file, path):
 
 def check_project(proj: Project) -> list[Diagnostic]:
     obs = list(proj.kind("observable").values())
-    value_tree = _build_group([s for s in obs if s.obj.get("role") in ("state", "derived")])
+    value_tree = _build_group([s for s in obs if s.obj.get("role") == "state"])
     params_tree = _build_group([s for s in obs if s.obj.get("role") == "parameter"])
     events = proj.kind("event")
 
@@ -609,7 +615,7 @@ def _check_invariant(sym, value_tree, params_tree):
 def _trees(proj: Project):
     obs = list(proj.kind("observable").values())
     return (
-        _build_group([s for s in obs if s.obj.get("role") in ("state", "derived")]),
+        _build_group([s for s in obs if s.obj.get("role") == "state"]),
         _build_group([s for s in obs if s.obj.get("role") == "parameter"]),
         proj.kind("event"),
     )

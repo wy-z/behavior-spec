@@ -13,9 +13,8 @@ import json
 import os
 
 from . import hashing
-from .model import REVIEW_STATE_FILENAME, Project
+from .model import REVIEW_KINDS, REVIEW_STATE_FILENAME, Project
 
-REVIEW_KINDS = ("module", "behavior", "invariant", "flow")
 STORED_DECISIONS = ("approved", "changes_requested", "rejected")
 STATUSES = STORED_DECISIONS + ("stale", "pending")
 
