@@ -28,12 +28,15 @@ which conditions MUST always hold.**
   root need not be the repo root; a subdirectory like `docs/behavior/` is fine.
 - Behavior Spec files are `*.bspec.json` (matched by `specGlobs` under the bspec
   root) — these you may write.
-- **Never edit `bspec.json`.** Only `bspec review` may create review decisions.
+- **Never write review decisions in `bspec.json`** — only `bspec review` (a human
+  keypress) records them; sole exception: a human-delegated batch (*Assisting a
+  large review*). The file's project config (`lang`, `specGlobs`, the type-word
+  `glossary` below) is not a decision — setting it up is fine.
 - `bspec.json` declares `lang` (default `en`) **in this one place**: the language
   for all human-readable text (`name`/`title`/`rationale`/`description`) in
   `*.bspec.json`. Write that text in that language; leave ids, CEL, and schemas
   unchanged.
-- For a non-English `lang`, also fill `bspec.json`'s `glossary` with the localized
+- For a non-English `lang`, also fill `bspec.json`'s project `glossary` with the localized
   **type words** — `module`/`behavior`/`invariant`/`flow`/`interface`/`event`/
   `observable`/`input`/`output`/`state`/`parameter` (e.g. `"interface": "接口"`).
   `bspec review` prepends each unit's raw `[kind][direction]` tag and looks these up
@@ -45,7 +48,9 @@ which conditions MUST always hold.**
 
 ## The tool is deterministic — never guess what it would say
 
-`bspec` does no LLM work. Always run it instead of reasoning about validity:
+`bspec` does no LLM work. Always run it instead of reasoning about validity.
+If the CLI is not on PATH, install it first:
+`uv tool install bspec --from git+https://github.com/wy-z/behavior-spec`
 
 ```bash
 bspec status --json        # what is pending / stale / approved
@@ -95,8 +100,8 @@ scheduler) — and define that term in the file `glossary`. It scopes *who* the
 requirement is about for review; omit it for actorless rules. It is hashed when
 present, so editing it re-opens review.
 
-After writing files, two gates are mandatory before you ask for human review — skip
-neither:
+After writing files, two gates are mandatory before you ask for human review — and
+before any delegated approval — skip neither:
 1. `bspec validate --json` — fix **every** error (schema, references, CEL types).
 2. **Spec self-review** (see below) — the semantic checks the validator cannot make;
    resolve every finding.
@@ -241,9 +246,10 @@ request — never on your own initiative, and never during authoring (that is th
 gate above, which approves nothing). Three hard limits gate every approval:
 
 - **Work only from a list the human has seen.** They name the scope — a module, a kind, or
-  an id list; a bare "help me review" or "all pending" names none. Unless they handed you
-  the exact ids, enumerate the units you would approve (after the two limits below), show
-  that list, and get their go-ahead before you write anything. Never sweep any scope unseen.
+  an id list. A bare "help me review" or "all pending" is not a seen list: unless they
+  handed you the exact ids, enumerate the units you would approve (after the two limits
+  below), show that list, and get their go-ahead before you write anything. Never sweep
+  any scope unseen.
 - **Only `pending` units.** Approve a unit only if `bspec status --json` reports it
   `pending` (never reviewed). Never touch one that already carries a decision — `approved`,
   `changes_requested`, `rejected`, or `stale`: that is a human's call (or its history), and
@@ -255,12 +261,13 @@ gate above, which approves nothing). Three hard limits gate every approval:
   privacy, legal/compliance, external side effects, or anything irreversible or
   policy-laden — those go to the human even when perfectly worded. When in doubt, leave it.
 
-There is no non-interactive approve command — you edit the review-state file yourself:
+There is no non-interactive approve command — you add the delegated entries to the
+review-state file yourself:
 
 1. `bspec status --json` — for each `pending` unit in scope read `units["kind:id"].hash`.
-2. Add its entry to the `reviews` map of `bspec.json` (if the file is absent, scaffold it
-   with `bspec init` first). Touch **only** the entries you are approving —
-   never edit or drop another unit's record:
+2. Add its entry to the `reviews` map of `bspec.json` (if the file is absent, confirm the
+   intended bspec root with the human, then `bspec init` there first). Touch **only** the
+   entries you are approving — never edit or drop another unit's record:
 
    ```json
    "behavior:<id>": {
@@ -295,9 +302,11 @@ new requirement in code without writing it into the spec.
 ## Prohibited actions
 
 Never:
-- write `bspec.json` **except** when the human explicitly asked you to help review, and then
-  only to approve `pending` units from a list they saw (or gave), as in
-  *Assisting a large review* — otherwise only `bspec review` (a human keypress) writes it;
+- record a review decision in `bspec.json` **except** when the human explicitly asked you
+  to help review, and then only to approve `pending` units from a list they saw (or gave),
+  as in *Assisting a large review* — otherwise only `bspec review` (a human keypress)
+  writes decisions (project config — `lang`, `specGlobs`, the type-word `glossary` — is
+  not a decision; maintaining it per *Source of truth* is fine);
 - overwrite or drop any existing review record — you approve only never-reviewed (`pending`)
   units, never overturn a human's `approved`/`changes_requested`/`rejected`/`stale` decision;
 - agent-approve a unit that turns on business judgment, or touches deletion, money, auth,

@@ -129,3 +129,28 @@ def test_path_rejects_call_and_index_chains():
     assert ex._path(env.compile("before.a.b")) == ["before", "a", "b"]
     assert ex._path(env.compile("before.items.all(x, x == 1)")) is None
     assert ex._path(env.compile("before.a[0]")) is None
+
+
+def test_has_requires_single_field_selection():
+    codes, _ = chk("has(trigger.sym)")
+    assert codes == []
+    codes, _ = chk("has(trigger)")  # bare namespace, no field selection
+    assert "cel" in codes
+    codes, _ = chk("has('x')")  # literal, not a path
+    assert "cel" in codes
+    codes, _ = chk("has(trigger.sym, trigger.qty)")  # wrong arity
+    assert "cel" in codes
+
+
+def test_list_concat_requires_matching_lists():
+    codes, _ = chk("size([1] + [2]) == 2")
+    assert codes == []
+    codes, _ = chk("size([1] + 'x') == 1")  # list + string
+    assert "cel" in codes
+    codes, _ = chk("size([1] + ['a']) == 1")  # element type mismatch
+    assert "cel" in codes
+
+
+def test_ternary_list_element_mismatch():
+    codes, _ = chk("size(true ? [1] : ['a']) == 1")
+    assert "cel" in codes

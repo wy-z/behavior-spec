@@ -93,7 +93,8 @@ stale the module — `bspec status` shows a per-module rollup instead.
 ```bash
 bspec init [path]                           # scaffold bspec.json (review-state file)
 bspec validate [path] [--json] [--strict]   # schema + reference + CEL checks (exit 1 on error)
-bspec review [--module M] [--kind K] [--status S]   # interactive; only writer of bspec.json
+bspec review [--module M] [--kind K] [--status S]   # interactive; only command that writes review decisions
 bspec view [--module M] [--kind K] [--status S]     # read-only browse of all cards (writes nothing)
 bspec status [path] [--json]                # per-kind + per-module status
+bspec doc [path] [--module M]               # markdown + mermaid export (GitHub/sharing)
 ```

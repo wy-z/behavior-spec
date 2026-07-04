@@ -73,28 +73,36 @@ def _find_down(start: str) -> str | None:
 DEFAULT_SPEC_GLOBS = ["**/*.bspec.json"]
 
 
-def spec_globs(root: str) -> list[str]:
-    """Spec-file globs from the project's review-state file, or the default."""
+def spec_globs(root: str) -> tuple[list[str], list[Diagnostic]]:
+    """Spec-file globs from the project's review-state file, or the default.
+
+    An unreadable review-state file is an error diagnostic, never a silent
+    fallback — it would quietly change which spec files load.
+    """
     path = os.path.join(root, REVIEW_STATE_FILENAME)
-    if os.path.exists(path):
-        try:
-            with open(path, encoding="utf-8") as f:
-                globs = json.load(f).get("specGlobs")
-            if isinstance(globs, list) and globs and all(isinstance(g, str) for g in globs):
-                return globs
-        except (OSError, json.JSONDecodeError):
-            pass
-    return DEFAULT_SPEC_GLOBS
+    if not os.path.exists(path):
+        return DEFAULT_SPEC_GLOBS, []
+    try:
+        with open(path, encoding="utf-8") as f:
+            globs = json.load(f).get("specGlobs")
+    except (OSError, json.JSONDecodeError) as e:
+        return DEFAULT_SPEC_GLOBS, [Diagnostic(
+            "error", "review-state-read",
+            f"cannot read {REVIEW_STATE_FILENAME} ({e}); using default specGlobs",
+            file=REVIEW_STATE_FILENAME)]
+    if isinstance(globs, list) and globs and all(isinstance(g, str) for g in globs):
+        return globs, []
+    return DEFAULT_SPEC_GLOBS, []
 
 
 def load_project(root: str) -> tuple[Project, list[Diagnostic]]:
     """Load every spec file matched by the project's specGlobs into an indexed Project."""
-    diags: list[Diagnostic] = []
     proj = Project(root=root, symbols={k: {} for k in ALL_KINDS})
     root_real = os.path.realpath(root)
     seen: set[str] = set()
 
-    for g in spec_globs(root):
+    globs, diags = spec_globs(root)
+    for g in globs:
         for abspath in sorted(glob.glob(os.path.join(root, g), recursive=True)):
             real = os.path.realpath(abspath)
             # Reject matches (absolute globs, ../ escapes) that leave the root.

@@ -27,7 +27,7 @@ After installing, you drive bspec by talking to your coding agent (e.g. Claude C
    → the agent runs `bspec init docs/behavior --lang zh`.
 2. **Author** — *"Start writing the behavior specs."*
    → the agent discovers modules, writes `*.bspec.json`, and runs `bspec validate`.
-3. **Review** — you approve each rule; the agent never approves its own work:
+3. **Review** — you approve each rule; the agent never approves on its own initiative:
 
    ```bash
    bspec review --module <module-id>
@@ -39,6 +39,7 @@ After installing, you drive bspec by talking to your coding agent (e.g. Claude C
 bspec init        # scaffold a project (--lang <code> sets language)
 bspec validate    # schema + reference + CEL type checks
 bspec review      # interactive review — the only command that writes review decisions
+bspec view        # read-only browse of the review cards (writes nothing)
 bspec status      # per-kind / per-module review status
 bspec doc         # markdown + mermaid (flow / module diagrams) for GitHub/sharing
 ```

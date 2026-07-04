@@ -17,7 +17,7 @@ import hashlib
 import rfc8785
 
 from . import expression
-from .model import Project, Symbol
+from .model import REVIEW_KINDS, Project, Symbol
 
 
 def _cel(node: dict | None) -> str | None:
@@ -153,7 +153,7 @@ def unit_hash(proj: Project, kind: str, oid: str) -> str | None:
 def all_hashes(proj: Project) -> dict[str, str]:
     """semantic hashes keyed 'kind:id' for every review unit."""
     out: dict[str, str] = {}
-    for kind in ("module", "behavior", "invariant", "flow"):
+    for kind in REVIEW_KINDS:
         for oid in proj.kind(kind):
             out[f"{kind}:{oid}"] = unit_hash(proj, kind, oid)  # type: ignore[assignment]
     return out

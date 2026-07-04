@@ -2,7 +2,7 @@
 
 > Status: **v0.1 freeze candidate (first version)**
 > This document is the normative implementation spec. It supersedes and freezes the v0.1 design notes.
-> Scope boundary: a Behavior Spec describes **observable semantics only**, never implementation. Spec files are written by a Code Agent; **review state is written only by the deterministic `bspec` tool**; a human approves.
+> Scope boundary: a Behavior Spec describes **observable semantics only**, never implementation. Spec files are written by a Code Agent; **review state records only human decisions** — by keypress in `bspec review`, or by the human's explicit delegation (§12).
 
 ---
 
@@ -14,7 +14,7 @@ UI apps, API services, quant strategies, background jobs, and data pipelines are
 
 Two hard boundaries:
 1. A Behavior Spec describes observable semantics, not implementation.
-2. Spec files may be Agent-written; review state may be written only by the deterministic tool, only by a human decision.
+2. Spec files may be Agent-written; a review decision is recorded only from a human decision — the human's keypress in `bspec review`, or the human's explicit delegation (§12) — never on the agent's own initiative.
 
 ---
 
@@ -39,7 +39,7 @@ Anything a human must review **must** be modeled as an observable or an event. A
 
 ```
 <project-root>/               # the directory that holds bspec.json
-├── bspec.json                # Review state (TOOL-ONLY); its location marks the root
+├── bspec.json                # Review state (decisions human-gated, §12); its location marks the root
 ├── *.bspec.json              # Behavior Spec files (Agent-writable), anywhere under the root
 └── skills/
     └── behavior-spec/        # Agent Skill (optional in repo)
@@ -49,7 +49,7 @@ Anything a human must review **must** be modeled as an observable or an event. A
 
 - The **project root is the nearest ancestor directory containing `bspec.json`** (`bspec` walks up from the cwd / given path to find it). Spec files are matched by `specGlobs` (default `**/*.bspec.json`) resolved relative to that root — a `behavior/` subdirectory is one convention, not a requirement.
 - All matched `*.bspec.json` files load into **one global symbol namespace** (see §11).
-- `bspec.json` holds: `lang` (default `en`), `specGlobs`, review decisions, reviewed semantic hashes, time, comment. Nothing else.
+- `bspec.json` holds: `lang` (default `en`), the optional type-word `glossary` (§12), `specGlobs`, review decisions, reviewed semantic hashes, time, comment. Nothing else.
 - **Review state is never written back into Behavior Spec files.**
 
 ---
@@ -333,7 +333,7 @@ v0.1 performs **no automated conflict detection** between CEL-predicated behavio
 ### `--json` output
 Machine-readable result for the Agent:
 ```json
-{ "ok": false, "counts": { "modules": 4, "behaviors": 23, "invariants": 5 },
+{ "ok": false, "counts": { "module": 4, "behavior": 23, "invariant": 5, "flow": 1 },
   "errors": [ { "code": "cel.type", "unit": "behavior:…", "path": "then[0].emit.where", "message": "…" } ],
   "warnings": [ … ] }
 ```
@@ -381,7 +381,7 @@ Cross-file references are permitted in v0.1 (global namespace).
 - `lang` = language of all human-readable text (`name`/`title`/`rationale`/`description`/`comment`) across the project's `*.bspec.json`; default `en`. Stored **only here**. Advisory metadata; not machine-enforced. Authors write that text in this language.
 - `glossary` (optional) = a project-level `{ type-word: localized }` map (`interface→接口`, `input→输入`, …). `bspec review` looks it up to localize the `[kind][direction]` tag it prepends to each unit's `name`; missing keys fall back to the raw word. **Not hashed** (cosmetic project config) — distinct from a module file's domain `glossary` (§5), which is hashed into the module.
 - **Reviewer identity is not stored** — git history is the authoritative record of who recorded each decision.
-- **Only `bspec review` writes this file.** The Agent never edits it and never writes a decision, hash, or time.
+- **By default only `bspec review` writes review decisions.** The one exception is explicit human delegation: the agent may then record approvals for **`pending` units only** — live hash copied verbatim, `comment` prefixed `agent-approved:`, never overwriting an existing record (protocol: `skills/behavior-spec/SKILL.md` *Assisting a large review*; rationale: `docs/design/2026-07-01-agent-assisted-review.md`). The agent never fabricates a decision, hash, or time on its own initiative.
 - **Module records are scope-only.** A `module:<id>` record approves the module's membership/scope, **not** its rules. Rule-level approval is strictly per behavior/invariant; `module:<id> == approved` must never be read as "the rules are approved".
 
 ---
@@ -463,7 +463,7 @@ Scaffold in `path` (default cwd): `bspec.json` (`lang` = `--lang`, default `en`;
 ```
 
 ### `bspec review [--module <id>] [--kind behavior|invariant|flow|module] [--status pending|stale|approved|changes_requested|rejected]`
-Interactive fullscreen review, one card at a time. The review card shows the `[kind][direction]` typed `name`, the EARS `title`, the `rationale`, the rule (GIVEN / WHEN / MUST), referenced terms, glossary, and — for flow/module — a derived diagram (flow pipeline / module I/O), all in human-readable form. Keys: `←`/`→` page between units, `↑`/`↓` (and the mouse wheel) scroll a card taller than the screen, `[a]` approve, `[r]` reject, `[c]` request changes (collects a comment), `[q]` or `Esc` quit; the same letter keys drive the non-interactive line-based fallback. Decisions are letters, never arrows — on the fullscreen alt-screen the mouse wheel is delivered as `↑`/`↓` (which scroll), so it can never fire a decision. Writes decisions (with current `semanticHash`, `reviewedAt`, optional `comment`) to `bspec.json`. **This is the only command that writes `bspec.json`.**
+Interactive fullscreen review, one card at a time. The review card shows the `[kind][direction]` typed `name`, the EARS `title`, the `rationale`, the rule (GIVEN / WHEN / MUST), referenced terms, glossary, and — for flow/module — a derived diagram (flow pipeline / module I/O), all in human-readable form. Keys: `←`/`→` page between units, `↑`/`↓` (and the mouse wheel) scroll a card taller than the screen, `[a]` approve, `[r]` reject, `[c]` request changes (collects a comment), `[q]` or `Esc` quit; the same letter keys drive the non-interactive line-based fallback. Decisions are letters, never arrows — on the fullscreen alt-screen the mouse wheel is delivered as `↑`/`↓` (which scroll), so it can never fire a decision. Writes decisions (with current `semanticHash`, `reviewedAt`, optional `comment`) to `bspec.json`. **This is the only command that writes review decisions.**
 
 ### `bspec view [--module <id>] [--kind behavior|invariant|flow|module] [--status <status>]`
 Read-only browse of the same cards — every unit by default, regardless of status, so approved work stays viewable. Same navigation/scroll keys as `review` minus the decision keys (`←`/`→` page, `↑`/`↓` scroll, `[q]`/`Esc` quit). Writes nothing; non-interactive stdin prints the cards in sequence.
@@ -481,8 +481,8 @@ Counts per kind per status, including computed `pending`/`stale`, plus a per-mod
 `skills/behavior-spec/` with `SKILL.md` + `references/`.
 
 Responsibilities (Agent) vs the tool/human:
-- **Agent**: scan project, create module stubs, generate/revise behaviors & invariants, run `bspec validate`, respond to `changes_requested`, remove `rejected` items, implement directly from the spec files.
-- **Agent must NOT**: write/modify any review record, mark anything approved, change a semantic hash, hide validation errors, silently replace an approved behavior, encode implementation choices as observable behavior, or treat current source as intended behavior without human review.
+- **Agent**: scan project, create module stubs, generate/revise behaviors & invariants, run `bspec validate`, respond to `changes_requested`, remove `rejected` items, record human-delegated batch approvals (§12), implement directly from the spec files.
+- **Agent must NOT**: write or modify any review record on its own initiative (the sole exception is the human-delegated, pending-only batch protocol of §12), overturn an existing decision, change a semantic hash, hide validation errors, silently replace an approved behavior, encode implementation choices as observable behavior, or treat current source as intended behavior without human review.
 
 Closed loop:
 ```
@@ -518,8 +518,10 @@ src/bspec/
 ├── expression.py   # CEL: type model, namespace tree, Lark-tree checker, ref extraction, canonical S-expr
 ├── hashing.py      # normative extraction + canonical CEL + JCS + sha256 (module/flow non-cascade)
 ├── status.py       # pending/stale derivation + per-module rollup
-├── review.py       # bspec.json read/write + interactive review (sole writer)
-├── cli.py          # argparse: init / validate / review / status / doc
+├── review.py       # bspec.json read/write + interactive review/view (sole writer of review decisions)
+├── diagram.py      # mermaid derivation: flow pipelines + module context graphs
+├── doc.py          # markdown + mermaid export (bspec doc)
+├── cli.py          # argparse: init / validate / review / view / status / doc
 └── schemas/        # bspec.schema.json, review_state.schema.json
 tests/              # schema, loader, checks, expression (CEL), hashing (golden+stability), review+status
 ```
@@ -559,7 +561,7 @@ tests/              # schema, loader, checks, expression (CEL), hashing (golden+
 ## 20. v0.1 acceptance criteria
 
 - [ ] Meta-schema validates all 8 object types with `unevaluatedProperties:false`; unknown fields fail.
-- [ ] Loader builds one global kind-keyed symbol table from `behavior/**/*.bspec.json`.
+- [ ] Loader builds one global kind-keyed symbol table from the project's `specGlobs` (default `**/*.bspec.json`).
 - [ ] All references (§11) resolve or ERROR; direction/namespace misuse ERRORs.
 - [ ] Observable/parameter prefix-collision ERRORs; CEL-id and property-name regexes enforced.
 - [ ] Every CEL expression parses, type-checks against the §7.2 nested types, and must return `bool`; the §7.3 whitelist is enforced.
@@ -568,6 +570,6 @@ tests/              # schema, loader, checks, expression (CEL), hashing (golden+
 - [ ] Every object has a `name`; review units have `title` + `rationale` (both in the hash); stub `rationale` (== title/name/id) and stub `name` (== id) rejected; file-level `glossary` surfaced in cards.
 - [ ] Semantic hash is stable under formatting / `name` / `origin` changes, and changes under any normative edit (`title`, `rationale`, CEL operand, referenced schema or `description`, module/flow membership).
 - [ ] `pending`/`stale` derived correctly; dependency-schema change marks dependents stale.
-- [ ] `bspec init|validate|review|status|doc` behave per §16; only `review` writes `bspec.json`.
+- [ ] `bspec init|validate|review|view|status|doc` behave per §16; among commands only `review` writes review decisions (`view` writes nothing).
 - [ ] No LLM and no network in any core command.
 ```

@@ -70,7 +70,7 @@ def _badge(stat: str) -> Text:
 def _typed_name(kind: str, obj: dict, oid: str, labels: dict) -> str:
     """`[kind][direction] readable-name`. The tag is the object's raw kind +
     direction/role, prepended at display time so a reviewer always sees *what a
-    unit is*. `labels` (authored once in bspec.json `typeLabels`) localizes each
+    unit is*. `labels` (the type-word `glossary` in bspec.json) localizes each
     token if present; the tool never translates, only looks up. `name` is the
     authored readable label."""
     def tok(t: str) -> str:

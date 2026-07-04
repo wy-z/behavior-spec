@@ -11,9 +11,9 @@ core, and without approving anything the human did not delegate.
   outside the CLI. Approvals live in `bspec.json` keyed by the unit's semantic hash, so any
   later change to the prose/CEL re-opens review regardless of who approved.
 - **Approval is the human's to give or delegate.** By default only `bspec review` (a human
-  keypress) writes `bspec.json`. The agent writes an approval **only** when the human
-  explicitly asks it to help review — then it acts as the human's delegate, never on its own
-  initiative.
+  keypress) writes review decisions into `bspec.json`. The agent writes an approval
+  **only** when the human explicitly asks it to help review — then it acts as the human's
+  delegate, never on its own initiative.
 - **Clarity ≠ correctness.** An agent can judge *expression quality* (does the prose
   faithfully & unambiguously describe the CEL?) but not whether a well-expressed behavior
   *should exist*. A perfectly worded `delete account without confirmation` is high-clarity
@@ -55,9 +55,9 @@ When many units are pending/stale and the human asks for help, the agent records
 for the pending units it can confidently clear, and leaves the rest:
 
 - **Opt-in + a list the human saw.** Only when the human explicitly asks, over a scope they
-  name (module / kind / id list — "all pending" or a bare "help me review" names none).
-  Unless the human gave the exact ids, the agent shows the units it would approve and gets
-  a go-ahead before any write — never any scope swept unseen.
+  name (module / kind / id list — "all pending" or a bare "help me review" is not a seen
+  list). Unless the human gave the exact ids, the agent shows the units it would approve
+  and gets a go-ahead before any write — never any scope swept unseen.
 - **`pending` only — never overturn a decision.** The agent approves only units `bspec
   status --json` reports as `pending` (never reviewed). It never edits a unit already
   carrying `approved`/`changes_requested`/`rejected`/`stale`; overturning a human's call (or
