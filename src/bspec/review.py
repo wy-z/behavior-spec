@@ -1,8 +1,7 @@
-"""Interactive review — the ONLY writer of the review-state file (bspec.json).
+"""Interactive review — writes the review-state file (bspec.json) from human decisions.
 
-The Agent never writes review records; only this module does, and only from an
-explicit human decision. Rendering uses `rich`; the verdict/loop logic stays
-plain stdlib so piped input keeps working.
+Every record this module writes comes from an explicit human keypress. Rendering
+uses `rich`; the verdict/loop logic stays plain stdlib so piped input keeps working.
 """
 
 from __future__ import annotations
