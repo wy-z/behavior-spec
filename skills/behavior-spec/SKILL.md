@@ -271,6 +271,13 @@ for the human. Only on request — never on your own initiative, and never durin
   gated by low-stakes: flagging a concern on a deletion/money/auth unit is exactly its purpose
   — it approves nothing, the human still decides. No specific concern, and not your call to
   make → just leave it `pending`.
+- **Write the dispute for the card, not the diff.** The `comment` renders on the review card,
+  so it must be decidable from that one card the way the `title` is (standalone-reviewability).
+  Write it in plain words, in three parts: **(1)** the *consequence* — what a cold reviewer
+  would wrongly approve, or what breaks; **(2)** one concrete *example* of it happening (for an
+  unrelated rule this might read "a session left idle 31 minutes is still treated as logged
+  in"); **(3)** the code evidence (`file:line`) as a trailing citation. A wall of symbol/line
+  refs up front is a lead the human cannot act on.
 
 There is no non-interactive command for either — you add the delegated entries to the
 review-state file yourself:
