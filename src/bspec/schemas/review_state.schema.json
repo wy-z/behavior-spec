@@ -24,11 +24,17 @@
         "semanticHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
         "decision": {
           "type": "string",
-          "enum": ["approved", "changes_requested", "rejected"]
+          "enum": ["approved", "rejected", "disputed"]
         },
         "reviewedAt": { "type": "string" },
         "comment": { "type": "string" }
       },
+      "allOf": [
+        {
+          "if": { "required": ["decision"], "properties": { "decision": { "const": "disputed" } } },
+          "then": { "required": ["comment"] }
+        }
+      ],
       "unevaluatedProperties": false
     }
   }

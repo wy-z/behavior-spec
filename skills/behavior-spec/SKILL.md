@@ -58,8 +58,8 @@ bspec validate --json      # schema + reference + CEL type errors
 ```
 
 Before changing specs, read from `status --json`: existing module ids, which
-behaviors/invariants are `approved`, and which are `pending`, `stale`, or
-`changes_requested` (with their comments).
+behaviors/invariants are `approved`, and which are `pending`, `stale`, or `disputed`
+(with their comments).
 
 ## Module discovery (when no specs exist yet)
 
@@ -201,7 +201,7 @@ anything (see *Prohibited actions*). Check each unit against the card the human 
 - **cross-unit conflict** — no two units have overlapping `given`/`when` with
   contradictory `then`, and no duplicate intent.
 
-Resolve each finding: on a `pending`, `changes_requested`, or `stale` unit, fix the
+Resolve each finding: on a `pending`, `disputed`, or `stale` unit, fix the
 `*.bspec.json` and re-validate. On an `approved` or `rejected` unit, do **not** silently
 edit it (editing an approved unit re-opens its review; a rejected one is replaced only
 when the reviewer asks) — surface it. Any judgment call (is this really a conflict? is
@@ -210,7 +210,7 @@ this ambiguity acceptable?) — surface it with your recommendation; the human d
 ## Review (the human owns every decision)
 
 ```bash
-bspec review --module <module-id>      # interactive: ←/→ unit, ↑/↓ scroll, [a]pprove [r]eject [c]hanges [q]uit
+bspec review --module <module-id>      # interactive: ←/→ unit, ↑/↓ scroll, [a]pprove [r]eject [c] dispute [q]uit
 ```
 
 The review cards and `bspec doc` show diagrams for flows (an ordered step
@@ -230,44 +230,55 @@ for a scoped batch (*Assisting a large review*). After review:
 bspec status --json
 ```
 
-For each `changes_requested` item: read the comment, edit the behavior
-(preserve its id if it is still the same conceptual behavior), re-validate, ask
-for another review. For `rejected` items: remove them, or replace only when the
-reviewer explicitly asks for a different behavior.
+For each human-raised `disputed` item (its `comment` is *not* prefixed
+`agent-disputed:`): read the comment, edit the behavior (preserve its id if it is
+still the same conceptual behavior), re-validate, ask for another review. Leave
+your own `agent-disputed:` items for the human to resolve. For `rejected` items:
+remove them, or replace only when the reviewer explicitly asks for a different
+behavior.
 
 A spec becomes `stale` automatically when its normative content — or the schema
 of an observable/event it references — changes. Stale items need re-review.
 
 ## Assisting a large review (only when the human asks)
 
-When the human **explicitly asks** you to help clear a batch, you act as their delegate:
-record approvals for the units you can confidently clear, and leave the rest. Only on
-request — never on your own initiative, and never during authoring (that is the self-review
-gate above, which approves nothing). Three hard limits gate every approval:
+When the human **explicitly asks** you to help clear a batch, you act as their delegate on
+each `pending` unit in scope: **approve** the ones you can confidently clear, **dispute** —
+with the reason — the ones you have a specific concern about, and leave the rest `pending`
+for the human. Only on request — never on your own initiative, and never during authoring
+(that is the self-review gate above, which approves nothing). Hard limits:
 
 - **Work only from a list the human has seen.** They name the scope — a module, a kind, or
   an id list. A bare "help me review" or "all pending" is not a seen list: unless they
-  handed you the exact ids, enumerate the units you would approve (after the two limits
-  below), show that list, and get their go-ahead before you write anything. Never sweep
-  any scope unseen.
-- **Only `pending` units.** Approve a unit only if `bspec status --json` reports it
-  `pending` (never reviewed). Never touch one that already carries a decision — `approved`,
-  `changes_requested`, `rejected`, or `stale`: that is a human's call (or its history), and
-  overturning it is the human's job, not yours.
-- **Only expression-clear + low-stakes units.** The self-review checks above must all pass
-  **and** the requirement must be mechanical and self-evidently right. Clarity ≠ correctness:
-  a well-worded rule can still be wrong to ship, so **never** agent-approve a unit whose
-  behavior touches deletion or data loss, money/billing, auth/permissions, security or
-  privacy, legal/compliance, external side effects, or anything irreversible or
-  policy-laden — those go to the human even when perfectly worded. When in doubt, leave it.
+  handed you the exact ids, enumerate the units you would approve or dispute (after the
+  limits below), show that list, and get their go-ahead before you write anything. Never
+  sweep any scope unseen.
+- **Only `pending` units — approve or dispute.** Touch a unit only if `bspec status --json`
+  reports it `pending` (never reviewed). Never touch one that already carries a decision —
+  `approved`, `rejected`, `disputed`, or `stale`: that is a human's call (or its history),
+  and overturning it is the human's job, not yours.
+- **Approve only expression-clear + low-stakes units.** The self-review checks above must all
+  pass **and** the requirement must be mechanical and self-evidently right. Clarity ≠
+  correctness: a well-worded rule can still be wrong to ship, so **never** agent-approve a
+  unit whose behavior touches deletion or data loss, money/billing, auth/permissions,
+  security or privacy, legal/compliance, external side effects, or anything irreversible or
+  policy-laden — those go to the human even when perfectly worded. When in doubt, don't
+  approve.
+- **Dispute = a specific, articulable concern.** When a unit is *not* clearly approvable — a
+  likely error, an ambiguity, a contradiction with another unit, or a high-stakes consequence
+  worth surfacing — record `disputed` with the concern as its `comment`, rather than leave it
+  silently `pending`, so the human sees your analysis when they review. Dispute is **not**
+  gated by low-stakes: flagging a concern on a deletion/money/auth unit is exactly its purpose
+  — it approves nothing, the human still decides. No specific concern, and not your call to
+  make → just leave it `pending`.
 
-There is no non-interactive approve command — you add the delegated entries to the
+There is no non-interactive command for either — you add the delegated entries to the
 review-state file yourself:
 
 1. `bspec status --json` — for each `pending` unit in scope read `units["kind:id"].hash`.
 2. Add its entry to the `reviews` map of `bspec.json` (if the file is absent, confirm the
    intended bspec root with the human, then `bspec init` there first). Touch **only** the
-   entries you are approving — never edit or drop another unit's record:
+   entries you are recording — never edit or drop another unit's record. To approve:
 
    ```json
    "behavior:<id>": {
@@ -278,16 +289,29 @@ review-state file yourself:
    }
    ```
 
+   To dispute — the same entry with `decision: "disputed"` and the concern as its `comment`
+   (**required** here: a dispute is nothing without its reason):
+
+   ```json
+   "behavior:<id>": {
+     "semanticHash": "<the live units[key].hash, copied verbatim>",
+     "decision": "disputed",
+     "reviewedAt": "<current local time, ISO-8601>",
+     "comment": "agent-disputed: <the specific concern the human must weigh>"
+   }
+   ```
+
    - Copy the **live** hash verbatim; never invent one. A wrong hash makes the record
-     `stale` (the same guard as any drifted review), so an approval can never outlive the
-     spec it approved.
-   - `comment` **must** begin with the literal `agent-approved:`. The record has no reviewer
-     field, so that fixed prefix is the audit marker that lets anyone (or a later tool) tell
-     your approvals from a human's; after it, say why the unit is clearly correct.
-3. `bspec status --json` again — confirm each unit you touched now reads `approved` (not
-   `stale`, which means a wrong hash; a crash means you malformed the JSON — fix it), and
-   that no other unit's status changed.
-4. Report which units you approved (with the reasons) and which you left for the human.
+     `stale` (the same guard as any drifted review), so the record can never outlive the
+     spec it describes.
+   - `comment` **must** begin with the literal `agent-approved:` or `agent-disputed:`. The
+     record has no reviewer field, so that fixed prefix is the audit marker that lets anyone
+     (or a later tool) tell your entries from a human's; after it, say why.
+3. `bspec status --json` again — confirm each unit you touched now reads `approved` or
+   `disputed` (not `stale`, which means a wrong hash; a crash means you malformed the JSON —
+   fix it), and that no other unit's status changed.
+4. Report which units you approved, which you disputed (with the concern), and which you
+   left for the human.
 
 ## Implementing code from specs
 
@@ -303,15 +327,17 @@ new requirement in code without writing it into the spec.
 
 Never:
 - record a review decision in `bspec.json` **except** when the human explicitly asked you
-  to help review, and then only to approve `pending` units from a list they saw (or gave),
+  to help review, and then only to approve or dispute `pending` units from a list they saw (or gave),
   as in *Assisting a large review* — otherwise only `bspec review` (a human keypress)
   writes decisions (project config — `lang`, `specGlobs`, the type-word `glossary` — is
   not a decision; maintaining it per *Source of truth* is fine);
-- overwrite or drop any existing review record — you approve only never-reviewed (`pending`)
-  units, never overturn a human's `approved`/`changes_requested`/`rejected`/`stale` decision;
+- overwrite or drop any existing review record — you record (approve or dispute) only
+  never-reviewed (`pending`) units, never overturn an existing
+  `approved`/`rejected`/`disputed`/`stale` decision;
 - agent-approve a unit that turns on business judgment, or touches deletion, money, auth,
   security/privacy, legal, external side effects, or anything irreversible — those stay the
-  human's even when clearly worded;
+  human's even when clearly worded (you may `dispute` one to surface a concern — that
+  approves nothing — but never approve it);
 - fabricate a semantic hash — always copy the live `units[key].hash` from `bspec status --json`;
 - hide validation errors;
 - silently replace an approved behavior;

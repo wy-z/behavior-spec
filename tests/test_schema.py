@@ -78,3 +78,19 @@ def test_embedded_meta_schema_is_itself_valid():
 
     Draft202012Validator.check_schema(schema.load_embedded("bspec.schema.json"))
     Draft202012Validator.check_schema(schema.load_embedded("review_state.schema.json"))
+
+
+def test_disputed_review_requires_a_comment():
+    """A `disputed` record is meaningless without its reason, so the review-state schema
+    requires `comment` for it — and only it (other decisions stay comment-optional)."""
+    from jsonschema import Draft202012Validator
+
+    validator = Draft202012Validator(schema.load_embedded("review_state.schema.json"))
+
+    def state(rec):
+        return {"version": "0.1.0", "reviews": {"behavior:x": rec}}
+
+    base = {"semanticHash": "sha256:" + "0" * 64, "reviewedAt": "2026-07-07T00:00:00+08:00"}
+    assert not validator.is_valid(state({**base, "decision": "disputed"}))
+    assert validator.is_valid(state({**base, "decision": "disputed", "comment": "agent-disputed: why"}))
+    assert validator.is_valid(state({**base, "decision": "approved"}))

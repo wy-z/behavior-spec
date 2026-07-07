@@ -15,7 +15,7 @@ import os
 from . import hashing
 from .model import REVIEW_KINDS, REVIEW_STATE_FILENAME, Project
 
-STORED_DECISIONS = ("approved", "changes_requested", "rejected")
+STORED_DECISIONS = ("approved", "rejected", "disputed")
 STATUSES = STORED_DECISIONS + ("stale", "pending")
 
 
@@ -38,9 +38,11 @@ def compute(proj: Project) -> dict[str, dict]:
         if rec is None:
             out[key] = {"hash": h, "status": "pending", "prior": None}
         elif rec.get("semanticHash") == h and rec.get("decision") in STORED_DECISIONS:
-            out[key] = {"hash": h, "status": rec.get("decision"), "prior": None}
+            out[key] = {"hash": h, "status": rec.get("decision"), "prior": None,
+                        "comment": rec.get("comment")}
         else:
-            out[key] = {"hash": h, "status": "stale", "prior": rec.get("decision")}
+            out[key] = {"hash": h, "status": "stale", "prior": rec.get("decision"),
+                        "comment": rec.get("comment")}
     return out
 
 
