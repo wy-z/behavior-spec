@@ -58,6 +58,59 @@ def test_view_is_read_only(tmp_path):
     assert not (Path(root) / REVIEW_STATE_FILENAME).exists()
 
 
+def test_disputed_decision_is_stored_and_carries_reason(tmp_path):
+    """`disputed` is a stored decision: fresh while the hash holds (reason retained),
+    and it drifts to stale like any decision once the spec changes (prior kept)."""
+    proj, root = _proj(tmp_path)
+    key = f"behavior:{OPEN_LONG}"
+    reason = "agent-disputed: entry price is ambiguous"
+    review.record_decision(root, key, "disputed",
+                           hashing.unit_hash(proj, "behavior", OPEN_LONG), comment=reason)
+    info = status.compute(proj)[key]
+    assert info["status"] == "disputed"
+    assert info["comment"] == reason
+
+    proj.get("behavior", OPEN_LONG).obj["given"]["cel"] = "before.session.open"
+    drifted = status.compute(proj)[key]
+    assert drifted["status"] == "stale"
+    assert drifted["prior"] == "disputed"
+    assert drifted["comment"] == reason
+
+
+def test_disputed_is_in_default_review_scope():
+    """A delegated agent's flag must reach the human: `disputed` is in `bspec review`'s
+    default status set, so it is surfaced without an explicit --status."""
+    assert "disputed" in review._REVIEW_DEFAULT_STATUS
+
+
+def test_card_renders_the_review_reason(tmp_path):
+    """The reason is shown on the card — a current *Dispute* while fresh, a *Prior dispute*
+    once the unit drifts to stale (so a stale note never reads as a live one)."""
+    import io
+
+    from rich.console import Console
+
+    proj, root = _proj(tmp_path)
+    key = f"behavior:{OPEN_LONG}"
+    review.record_decision(root, key, "disputed",
+                           hashing.unit_hash(proj, "behavior", OPEN_LONG),
+                           comment="agent-disputed: entry price is ambiguous")
+
+    def render(info):
+        sink = io.StringIO()
+        Console(width=100, file=sink).print(review._card(proj, "behavior", OPEN_LONG, info))
+        return sink.getvalue()
+
+    fresh = render(status.compute(proj)[key])
+    assert "ambiguous" in fresh
+    assert "Dispute" in fresh
+
+    proj.get("behavior", OPEN_LONG).obj["given"]["cel"] = "before.session.open"
+    stale = render(status.compute(proj)[key])
+    assert "ambiguous" in stale
+    assert "Prior dispute" in stale
+
+
 def test_written_review_state_is_schema_valid(tmp_path):
     from jsonschema import Draft202012Validator
 
@@ -65,7 +118,7 @@ def test_written_review_state_is_schema_valid(tmp_path):
 
     proj, root = _proj(tmp_path)
     review.record_decision(root, f"behavior:{OPEN_LONG}",
-                           "changes_requested",
+                           "disputed",
                            hashing.unit_hash(proj, "behavior", OPEN_LONG),
                            comment="produce at next bar open")
     state = status.load_review_state(root)

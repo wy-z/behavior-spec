@@ -182,7 +182,7 @@ def build_parser() -> argparse.ArgumentParser:
     pr.add_argument("--module", help="restrict to one module")
     pr.add_argument("--kind", choices=("module", "behavior", "invariant", "flow"))
     pr.add_argument("--status", choices=status.STATUSES,
-                    help="restrict to one status (default: pending+stale)")
+                    help="restrict to one status (default: pending+stale+disputed)")
     pr.set_defaults(func=cmd_review)
 
     pview = sub.add_parser("view", help="read-only browse of review cards (writes nothing)")

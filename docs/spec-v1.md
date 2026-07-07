@@ -366,7 +366,7 @@ Cross-file references are permitted in v0.1 (global namespace).
   "reviews": {
     "behavior:trading.ma-cross.open-long": {
       "semanticHash": "sha256:90bf32…",
-      "decision": "changes_requested",
+      "decision": "disputed",
       "reviewedAt": "2026-06-26T14:23:00-07:00",
       "comment": "Order should be produced at the next bar's open, not on this bar's close."
     }
@@ -375,13 +375,14 @@ Cross-file references are permitted in v0.1 (global namespace).
 ```
 
 - Review record key: `"<kind>:<id>"` where kind ∈ `module | behavior | invariant | flow`.
-- `decision` ∈ `approved | changes_requested | rejected`. **No `pending`/`stale` stored** — both are computed (§14).
+- `decision` ∈ `approved | rejected | disputed`. **No `pending`/`stale` stored** — both are computed (§14).
 - `reviewedAt` = RFC 3339.
-- `comment` optional.
+- `comment` optional, **except required on `disputed`** (a dispute is nothing without its reason).
+- **`disputed`** records a reviewer's substantive *reservation* rather than an approval — "reviewed, not approved; here is the concern." It is a stored decision, hash-bound like any other (so any spec change drifts it to `stale`), and is surfaced in `bspec review`'s default set so the human resolves it (an approve/reject keypress overwrites it). Its typical author is a delegated agent (below); it never counts as approval.
 - `lang` = language of all human-readable text (`name`/`title`/`rationale`/`description`/`comment`) across the project's `*.bspec.json`; default `en`. Stored **only here**. Advisory metadata; not machine-enforced. Authors write that text in this language.
 - `glossary` (optional) = a project-level `{ type-word: localized }` map (`interface→接口`, `input→输入`, …). `bspec review` looks it up to localize the `[kind][direction]` tag it prepends to each unit's `name`; missing keys fall back to the raw word. **Not hashed** (cosmetic project config) — distinct from a module file's domain `glossary` (§5), which is hashed into the module.
 - **Reviewer identity is not stored** — git history is the authoritative record of who recorded each decision.
-- **By default only `bspec review` writes review decisions.** The one exception is explicit human delegation: the agent may then record approvals for **`pending` units only** — live hash copied verbatim, `comment` prefixed `agent-approved:`, never overwriting an existing record (protocol: `skills/behavior-spec/SKILL.md` *Assisting a large review*; rationale: `docs/design/2026-07-01-agent-assisted-review.md`). The agent never fabricates a decision, hash, or time on its own initiative.
+- **By default only `bspec review` writes review decisions.** The one exception is explicit human delegation: the agent may then record, for **`pending` units only**, an `approved` **or** `disputed` decision — live hash copied verbatim, `comment` prefixed `agent-approved:` / `agent-disputed:`, never overwriting an existing record (protocol: `skills/behavior-spec/SKILL.md` *Assisting a large review*; rationale: `docs/design/2026-07-01-agent-assisted-review.md`). A dispute only flags a concern — it approves nothing — so it is not bound by the low-stakes exclusion that gates approval. The agent never fabricates a decision, hash, or time on its own initiative.
 - **Module records are scope-only.** A `module:<id>` record approves the module's membership/scope, **not** its rules. Rule-level approval is strictly per behavior/invariant; `module:<id> == approved` must never be read as "the rules are approved".
 
 ---
@@ -462,8 +463,8 @@ Scaffold in `path` (default cwd): `bspec.json` (`lang` = `--lang`, default `en`;
 0 errors, 3 warnings
 ```
 
-### `bspec review [--module <id>] [--kind behavior|invariant|flow|module] [--status pending|stale|approved|changes_requested|rejected]`
-Interactive fullscreen review, one card at a time. The review card shows the `[kind][direction]` typed `name`, the EARS `title`, the `rationale`, the rule (GIVEN / WHEN / MUST), referenced terms, glossary, and — for flow/module — a derived diagram (flow pipeline / module I/O), all in human-readable form. Keys: `←`/`→` page between units, `↑`/`↓` (and the mouse wheel) scroll a card taller than the screen, `[a]` approve, `[r]` reject, `[c]` request changes (collects a comment), `[q]` or `Esc` quit; the same letter keys drive the non-interactive line-based fallback. Decisions are letters, never arrows — on the fullscreen alt-screen the mouse wheel is delivered as `↑`/`↓` (which scroll), so it can never fire a decision. Writes decisions (with current `semanticHash`, `reviewedAt`, optional `comment`) to `bspec.json`. **This is the only command that writes review decisions.**
+### `bspec review [--module <id>] [--kind behavior|invariant|flow|module] [--status pending|stale|approved|rejected|disputed]`
+Interactive fullscreen review, one card at a time. The review card shows the `[kind][direction]` typed `name`, the EARS `title`, the `rationale`, the rule (GIVEN / WHEN / MUST), referenced terms, glossary, and — for flow/module — a derived diagram (flow pipeline / module I/O), all in human-readable form. Keys: `←`/`→` page between units, `↑`/`↓` (and the mouse wheel) scroll a card taller than the screen, `[a]` approve, `[r]` reject, `[c]` dispute (collects a reason), `[q]` or `Esc` quit; the same letter keys drive the non-interactive line-based fallback. Decisions are letters, never arrows — on the fullscreen alt-screen the mouse wheel is delivered as `↑`/`↓` (which scroll), so it can never fire a decision. Writes decisions (with current `semanticHash`, `reviewedAt`, optional `comment`) to `bspec.json`. **This is the only command that writes review decisions.**
 
 ### `bspec view [--module <id>] [--kind behavior|invariant|flow|module] [--status <status>]`
 Read-only browse of the same cards — every unit by default, regardless of status, so approved work stays viewable. Same navigation/scroll keys as `review` minus the decision keys (`←`/`→` page, `↑`/`↓` scroll, `[q]`/`Esc` quit). Writes nothing; non-interactive stdin prints the cards in sequence.
@@ -481,14 +482,14 @@ Counts per kind per status, including computed `pending`/`stale`, plus a per-mod
 `skills/behavior-spec/` with `SKILL.md` + `references/`.
 
 Responsibilities (Agent) vs the tool/human:
-- **Agent**: scan project, create module stubs, generate/revise behaviors & invariants, run `bspec validate`, respond to `changes_requested`, remove `rejected` items, record human-delegated batch approvals (§12), implement directly from the spec files.
+- **Agent**: scan project, create module stubs, generate/revise behaviors & invariants, run `bspec validate`, respond to human-raised `disputed` items, remove `rejected` items, record human-delegated batch approvals/disputes (§12), implement directly from the spec files.
 - **Agent must NOT**: write or modify any review record on its own initiative (the sole exception is the human-delegated, pending-only batch protocol of §12), overturn an existing decision, change a semantic hash, hide validation errors, silently replace an approved behavior, encode implementation choices as observable behavior, or treat current source as intended behavior without human review.
 
 Closed loop:
 ```
 1. Agent scans project        →  2. Agent writes module stubs   →  3. bspec validate
 4. Human reviews modules      →  5. Agent generates behaviors    →  6. bspec validate
-7. Human reviews behaviors/invariants  →  8. Agent fixes changes_requested  →  9. Human re-reviews
+7. Human reviews behaviors/invariants  →  8. Agent fixes human-raised disputes  →  9. Human re-reviews
 10. Agent implements from the spec files  →  11. New requirement = edit spec first, then code
 ```
 

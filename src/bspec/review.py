@@ -22,7 +22,12 @@ from rich.text import Text
 from . import diagram, expression, status
 from .model import REVIEW_STATE_FILENAME, Project
 
-_DECISIONS = {"a": "approved", "c": "changes_requested", "r": "rejected"}
+_DECISIONS = {"a": "approved", "c": "disputed", "r": "rejected"}
+
+# What `bspec review` surfaces by default: units still needing the human's eyes —
+# never-reviewed, drifted, or `disputed` (flagged, unresolved). Settled decisions
+# (approved / rejected) are reached only via an explicit `--status`.
+_REVIEW_DEFAULT_STATUS = ("pending", "stale", "disputed")
 
 
 def _now() -> str:
@@ -54,8 +59,8 @@ def record_decision(root: str, key: str, decision: str, sem_hash: str,
 # rendering (rich)
 # --------------------------------------------------------------------------- #
 _STATUS_STYLE = {
-    "pending": "yellow", "approved": "green", "changes_requested": "magenta",
-    "rejected": "red", "stale": "red",
+    "pending": "yellow", "approved": "green", "rejected": "red", "stale": "red",
+    "disputed": "dark_orange",
 }
 
 
@@ -246,6 +251,17 @@ def _card(proj: Project, kind: str, oid: str, info: dict, units: dict | None = N
         # rationale in its own box — the requirement (title) stays the bare headline
         body.append(_titled("Why", Panel(Text(o["rationale"]),
                                          border_style="dim", box=box.ROUNDED, padding=(0, 1))))
+    if info.get("comment"):
+        # The review record's own note — a dispute reason, or an agent-approved rationale —
+        # shown so a reviewer sees why, not just the badge. On a stale unit it is the *prior*
+        # note, labelled so it never reads as a current one.
+        stale = info["status"] == "stale"
+        decided = (info.get("prior") if stale else info["status"]) or ""
+        label = "Dispute" if decided == "disputed" else "Note"
+        if stale:
+            label = f"Prior {label.lower()}"
+        body.append(_titled(label, Panel(Text(info["comment"]), box=box.ROUNDED, padding=(0, 1),
+                                         border_style=_STATUS_STYLE.get(info["status"], "white"))))
 
     if kind in ("behavior", "invariant"):
         body += [_rule_table(kind, sym), _refs_table(proj, sym, kind, labels)]
@@ -295,7 +311,7 @@ def _card(proj: Project, kind: str, oid: str, info: dict, units: dict | None = N
 # scrolls (as users expect) and can never reach a decision.
 _KEYCAPS = [
     ("← →", "unit", "cyan"), ("↑ ↓", "scroll", "cyan"), ("a", "approve", "green"),
-    ("r", "reject", "red"), ("c", "changes", "magenta"), ("q", "quit", "white"),
+    ("r", "reject", "red"), ("c", "dispute", "dark_orange"), ("q", "quit", "white"),
 ]
 # `view` is the same carousel, read-only — navigation/scroll only, no decision keys.
 _VIEW_KEYCAPS = [
@@ -376,7 +392,7 @@ def _tty_ok() -> bool:
 
 
 def _ask_comment(live, console: Console, fd: int, saved) -> str | None:
-    """Leave the alt-screen and read a changes-comment in cooked mode, so native
+    """Leave the alt-screen and read a dispute reason in cooked mode, so native
     line editing and multibyte (e.g. Chinese) input work; then re-enter raw mode and
     the alt-screen. Empty input cancels. `live` is reused, so reset the overflow that
     `Live.stop()` flips to 'visible' before resuming."""
@@ -386,7 +402,7 @@ def _ask_comment(live, console: Console, fd: int, saved) -> str | None:
     live.stop()
     termios.tcsetattr(fd, termios.TCSADRAIN, saved)
     try:
-        comment = console.input("[magenta]comment (empty to cancel):[/] ").strip() or None
+        comment = console.input("[dark_orange]reason (empty to cancel):[/] ").strip() or None
     except (EOFError, KeyboardInterrupt):
         comment = None
     tty.setcbreak(fd)
@@ -428,7 +444,7 @@ def _run_carousel(proj: Project, console: Console, items: list, units: dict,
                   read_only: bool = False) -> int:
     """Fullscreen one-card-at-a-time browser: ←/→ page between units; ↑/↓ (and the mouse
     wheel) scroll a card taller than the screen; `q` quit. Unless `read_only`, it also
-    reviews — `a` approve, `r` reject, `c` request changes — recording each decision and
+    reviews — `a` approve, `r` reject, `c` dispute — recording each decision and
     advancing. Decisions are letter keys, never arrows (see _KEYCAPS); a decision repaints
     the card in place (its status is the same dict `units` holds). Past the last card ends."""
     import termios
@@ -447,6 +463,7 @@ def _run_carousel(proj: Project, console: Console, items: list, units: dict,
         kind, oid, info = items[idx]
         record_decision(proj.root, f"{kind}:{oid}", decision, info["hash"], comment)
         info["status"] = decision
+        info["comment"] = comment  # keep the repainted card in sync (clears a prior dispute reason)
         info.pop("prior", None)
         recorded += 1
         idx += 1  # advance; loop exits when this passes the last card
@@ -483,7 +500,7 @@ def _run_carousel(proj: Project, console: Console, items: list, units: dict,
                 elif not read_only and key == "c":
                     comment = _ask_comment(live, console, fd, saved)
                     if comment:
-                        decide("changes_requested", comment)
+                        decide("disputed", comment)
                     scroll = 0
     except KeyboardInterrupt:
         pass
@@ -499,13 +516,13 @@ def _run_carousel(proj: Project, console: Console, items: list, units: dict,
 
 def _run_linear(proj: Project, console: Console, items: list, units: dict) -> int:
     """Line-based fallback for non-terminal stdin (pipes/CI): print each card and read
-    a single letter — a approve, r reject, c changes, s/⏎ skip, q quit."""
+    a single letter — a approve, r reject, c dispute, s/⏎ skip, q quit."""
     recorded = 0
     for n, (kind, oid, info) in enumerate(items, 1):
         console.print()
         console.rule(f"[dim]{n}/{len(items)}[/]", align="left")
         console.print(_card(proj, kind, oid, info, units))
-        console.print("[dim]a approve  r reject  c changes  s skip  q quit[/]")
+        console.print("[dim]a approve  r reject  c dispute  s skip  q quit[/]")
         try:
             choice = console.input("[bold green]❯[/] ").strip().lower()
         except EOFError:
@@ -519,13 +536,13 @@ def _run_linear(proj: Project, console: Console, items: list, units: dict) -> in
             console.print("  [dim]? unrecognized; skipped[/]")
             continue
         comment = None
-        if decision == "changes_requested":
+        if decision == "disputed":
             try:
-                comment = console.input("  [magenta]comment:[/] ").strip() or None
+                comment = console.input("  [dark_orange]reason:[/] ").strip() or None
             except EOFError:
                 comment = None
             if comment is None:
-                console.print("  [dim]changes need a comment; skipped[/]")
+                console.print("  [dim]a dispute needs a reason; skipped[/]")
                 continue
         record_decision(proj.root, f"{kind}:{oid}", decision, info["hash"], comment)
         recorded += 1
@@ -546,7 +563,7 @@ def _make_console() -> Console:
 def run_review(proj: Project, kinds=None, module=None, status_filter=None) -> int:
     units = status.compute(proj)
     if status_filter is None:
-        status_filter = {"pending", "stale"}
+        status_filter = set(_REVIEW_DEFAULT_STATUS)
     items = _select(proj, units, kinds, module, status_filter)
     console = _make_console()
     if not items:

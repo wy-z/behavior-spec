@@ -77,9 +77,12 @@ object→typed object, array→list.
 ## Review status (computed, never stored)
 
 - no review record → `pending`
-- record hash == current → the recorded decision (`approved` / `changes_requested`
-  / `rejected`)
+- record hash == current → the recorded decision (`approved` / `rejected` / `disputed`)
 - record hash != current → `stale`
+- `disputed` = a reviewer's flagged reservation, reason in `comment` (the human's `[c]` key,
+  or a delegated agent instead of approving); `bspec review` shows it by default so the human
+  resolves it. It is the sole "needs a fix / has an objection" state — there is no separate
+  `changes_requested`.
 
 The semantic hash covers the approved contract: CEL (canonicalized), the unit's
 `title` + `rationale`, and the referenced observable/event meaning (schema +
